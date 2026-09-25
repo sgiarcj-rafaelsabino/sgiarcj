@@ -6,25 +6,67 @@ const uid = () => Date.now().toString(36) + Math.random().toString(36).substring
 const fmtCurr = (v) => (Number(v) || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
 function showLoading(show = true) {
-    document.getElementById("loading-overlay").style.display = show ? "flex" : "none";
+    const overlay = document.getElementById("loading-overlay");
+    if (overlay) overlay.style.display = show ? "flex" : "none";
 }
 
+/* Modais Bootstrap */
 const modalLogin = new bootstrap.Modal(document.getElementById("modalLogin"));
 const modalStudent = new bootstrap.Modal(document.getElementById("modalStudent"));
 const modalTx = new bootstrap.Modal(document.getElementById("modalTransaction"));
 
+// Variáveis globais para os gráficos
 let financeChart = null;
 let classChart = null;
-let globalStudentsCache = [];
 
+// Variável global para cache da lista de alunos
+let globalStudentsCache = [];
+let globalFinanceCache = [];
+
+/* FUNÇÕES AUXILIARES DE DATA */
+function parseLocalDate(dateStr) {
+    if (!dateStr) return new Date();
+
+    if (dateStr instanceof Date) {
+        return dateStr;
+    }
+
+    const str = String(dateStr).trim();
+
+    if (str.includes("T")) {
+        return new Date(str);
+    }
+
+    if (str.includes("-")) {
+        const parts = str.split("-");
+        return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+    }
+
+    return new Date(str);
+}
+
+function calcularIdade(dataNasc) {
+    if (!dataNasc) return null;
+    const hoje = new Date();
+    const nasc = parseLocalDate(dataNasc);
+    let idade = hoje.getFullYear() - nasc.getFullYear();
+    const m = hoje.getMonth() - nasc.getMonth();
+    if (m < 0 || (m === 0 && hoje.getDate() < nasc.getDate())) {
+        idade--;
+    }
+    return idade;
+}
+
+/* FUNÇÕES DE COMUNICAÇÃO COM O APPS SCRIPT (JSONP & POST) */
 function apiGet(sheetName) {
+    showLoading(true);
     return new Promise((resolve, reject) => {
         const callbackName = "jsonp_callback_" + Math.round(100000 * Math.random());
 
-        // Define a função de callback global temporária
         window[callbackName] = function (data) {
             delete window[callbackName];
             document.body.removeChild(script);
+            showLoading(false);
             if (data && data.error) {
                 reject(data.error);
             } else {
@@ -37,6 +79,7 @@ function apiGet(sheetName) {
         script.onerror = function () {
             delete window[callbackName];
             document.body.removeChild(script);
+            showLoading(false);
             reject(new Error("Falha na requisição JSONP. Verifique as permissões do script."));
         };
 
@@ -44,25 +87,40 @@ function apiGet(sheetName) {
     });
 }
 
-// Envio/Ações usando POST compatível
-async function apiPost(payload) {
+async function apiPost(sheetName, actionType, payload) {
+    showLoading(true);
     try {
-        const res = await fetch(API_URL, {
+        const bodyObj = {
+            action: actionType,
+            sheet: sheetName,
+        };
+
+        if (actionType === "create" || actionType === "update") {
+            bodyObj.data = payload;
+            bodyObj.id = payload.id;
+        } else if (actionType === "delete") {
+            bodyObj.id = payload;
+        }
+
+        await fetch(API_URL, {
             method: "POST",
-            mode: "cors",
-            headers: {
-                "Content-Type": "text/plain;charset=utf-8",
-            },
-            body: JSON.stringify(payload),
+            headers: { "Content-Type": "text/plain;charset=utf-8" },
+            body: JSON.stringify(bodyObj),
+            redirect: "follow",
         });
 
-        return await res.json();
+        // Aguarda 1.5 segundos para garantir que o Google Apps Script processe a gravação
+        await new Promise((r) => setTimeout(r, 1500));
+        return { success: true };
     } catch (err) {
         console.error("Erro no apiPost:", err);
         throw err;
+    } finally {
+        showLoading(false);
     }
 }
 
+/* EVENTOS DE AUTENTICAÇÃO E NAVEGAÇÃO */
 document.getElementById("form-login").addEventListener("submit", async (e) => {
     e.preventDefault();
 
@@ -72,16 +130,20 @@ document.getElementById("form-login").addEventListener("submit", async (e) => {
     const email = document.getElementById("login-email").value;
     const pass = document.getElementById("login-password").value;
 
-    const users = await apiGet("Usuarios");
-    const user = users.find((u) => u.email === email && String(u.pass) === String(pass));
+    try {
+        const users = await apiGet("Usuarios");
+        const user = users.find((u) => u.email === email && String(u.pass) === String(pass));
 
-    if (user) {
-        sessionStorage.setItem("giar_active_user", JSON.stringify(user));
-        document.body.classList.remove("unauthenticated");
-        modalLogin.hide();
-        renderApp();
-    } else {
-        alertEl.classList.remove("d-none");
+        if (user) {
+            sessionStorage.setItem("giar_active_user", JSON.stringify(user));
+            document.body.classList.remove("unauthenticated");
+            modalLogin.hide();
+            renderApp();
+        } else {
+            alertEl.classList.remove("d-none");
+        }
+    } catch (err) {
+        alert("Erro ao realizar login. Tente novamente.");
     }
 });
 
@@ -91,6 +153,7 @@ document.getElementById("btn-logout").addEventListener("click", () => {
     modalLogin.show();
 });
 
+/* BUSCA DE CEP */
 document.getElementById("student-cep").addEventListener("blur", async (e) => {
     const cep = e.target.value.replace(/\D/g, "");
     if (cep.length === 8) {
@@ -98,10 +161,10 @@ document.getElementById("student-cep").addEventListener("blur", async (e) => {
             const res = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
             const data = await res.json();
             if (!data.erro) {
-                document.getElementById("student-street").value = data.logradouro;
-                document.getElementById("student-neighborhood").value = data.bairro;
-                document.getElementById("student-city").value = data.localidade;
-                document.getElementById("student-uf").value = data.uf;
+                document.getElementById("student-street").value = data.logradouro || "";
+                document.getElementById("student-neighborhood").value = data.bairro || "";
+                document.getElementById("student-city").value = data.localidade || "";
+                document.getElementById("student-uf").value = data.uf || "";
             }
         } catch (err) {
             console.error(err);
@@ -109,120 +172,28 @@ document.getElementById("student-cep").addEventListener("blur", async (e) => {
     }
 });
 
+/* RENDERIZAÇÃO PRINCIPAL */
 async function renderApp() {
     const user = JSON.parse(sessionStorage.getItem("giar_active_user"));
     if (!user) return;
     document.getElementById("user-name").textContent = user.name;
 
-    const [students, finance] = await Promise.all([apiGet("Membros"), apiGet("Financas")]);
-
-    globalStudentsCache = students;
-
-    renderDashboard(students, finance);
-    renderStudents(students);
-    renderFinance(finance);
-    renderReports(finance);
-}
-
-function calcularIdade(dataNasc) {
-    if (!dataNasc) return null;
-    const hoje = new Date();
-    const nasc = new Date(dataNasc);
-    let idade = hoje.getFullYear() - nasc.getFullYear();
-    const m = hoje.getMonth() - nasc.getMonth();
-    if (m < 0 || (m === 0 && hoje.getDate() < nasc.getDate())) {
-        idade--;
-    }
-    return idade;
-}
-
-async function viewStudent(id) {
-    showLoading(true);
     try {
-        const students = await apiGet("Membros");
-        const student = students.find((s) => String(s.id) === String(id));
+        const [students, finance] = await Promise.all([apiGet("Membros"), apiGet("Financas")]);
 
-        if (!student) {
-            alert("Membro não encontrado na base de dados.");
-            return;
-        }
+        globalStudentsCache = students;
+        globalFinanceCache = finance;
 
-        fillModalStudent(student);
-        setModalFieldsDisabled(true);
-
-        document.querySelector("#modalStudent .modal-title").textContent = `Visualizar Cadastro: ${student.name}`;
-        document.querySelector('#form-student button[type="submit"]').style.display = "none";
-
-        modalStudent.show();
-    } catch (e) {
-        console.error("Erro ao visualizar membro:", e);
-        alert("Erro ao carregar dados do membro.");
-    } finally {
-        showLoading(false);
+        renderDashboard(students, finance);
+        renderStudents(students);
+        renderFinance(finance);
+        renderReports(finance);
+    } catch (err) {
+        console.error("Erro ao carregar os dados:", err);
     }
 }
 
-async function editStudent(id) {
-    showLoading(true);
-    try {
-        const students = await apiGet("Membros");
-        const student = students.find((s) => String(s.id) === String(id));
-
-        if (!student) {
-            alert("Membro não encontrado para edição.");
-            return;
-        }
-
-        fillModalStudent(student);
-        setModalFieldsDisabled(false);
-
-        document.querySelector("#modalStudent .modal-title").textContent = `Editar Cadastro: ${student.name}`;
-        document.querySelector('#form-student button[type="submit"]').style.display = "block";
-
-        modalStudent.show();
-    } catch (e) {
-        console.error("Erro ao editar membro:", e);
-        alert("Erro ao carregar dados para edição.");
-    } finally {
-        showLoading(false);
-    }
-}
-
-function fillModalStudent(s) {
-    const idField = document.getElementById("student-id");
-    if (idField) idField.value = s.id || "";
-
-    document.getElementById("student-status").value = s.status || "Ativo";
-    document.getElementById("student-name").value = s.name || "";
-    document.getElementById("student-dob").value = s.dob || "";
-    document.getElementById("student-rg").value = s.rg || "";
-    document.getElementById("student-financial").value = s.financial || "Dízimo";
-
-    document.getElementById("student-mother").value = s.mother || "";
-    document.getElementById("student-father").value = s.father || "";
-    document.getElementById("student-class").value = s.class || "";
-
-    document.getElementById("student-cep").value = s.cep || "";
-    document.getElementById("student-street").value = s.street || "";
-    document.getElementById("student-number").value = s.number || "";
-    document.getElementById("student-neighborhood").value = s.neighborhood || "";
-    document.getElementById("student-city").value = s.city || "";
-    document.getElementById("student-uf").value = s.uf || "";
-
-    document.getElementById("student-notes").value = s.notes || "";
-}
-
-function setModalFieldsDisabled(disabled) {
-    const form = document.getElementById("form-student");
-    const elements = form.querySelectorAll("input, select, textarea");
-
-    elements.forEach((el) => {
-        if (el.id !== "student-id") {
-            el.disabled = disabled;
-        }
-    });
-}
-
+/* RENDERIZAR DASHBOARD */
 function renderDashboard(students, finance) {
     const activeStudents = students.filter((s) => s.status === "Ativo");
     document.getElementById("dash-active-students").textContent = activeStudents.length;
@@ -248,32 +219,6 @@ function renderDashboard(students, finance) {
     const bdaysList = document.getElementById("dash-birthdays-list");
     bdaysList.innerHTML = "";
 
-    function parseLocalDate(dateStr) {
-        if (!dateStr) return new Date(); // Retorna a data atual se estiver vazio/null
-
-        // Se já for um objeto Date (muito comum em retornos de planilhas/APIs)
-        if (dateStr instanceof Date) {
-            return dateStr;
-        }
-
-        // Converte explicitamente para String caso seja um número ou outro tipo
-        const str = String(dateStr).trim();
-
-        // Se for uma string no formato ISO ou contendo 'T' (ex: "2026-09-24T00:00:00.000Z")
-        if (str.includes("T")) {
-            return new Date(str);
-        }
-
-        // Se for no formato YYYY-MM-DD
-        if (str.includes("-")) {
-            const parts = str.split("-");
-            return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
-        }
-
-        // Fallback genérico para outros formatos
-        return new Date(str);
-    }
-
     const monthStudents = students.filter((s) => {
         const dob = parseLocalDate(s.dob);
         return dob && dob.getMonth() === currMonth;
@@ -297,7 +242,9 @@ function renderDashboard(students, finance) {
     }
 
     const yearFilter = document.getElementById("dash-year-filter");
-    const anosDisponiveis = [...new Set(finance.map((f) => new Date(f.date).getFullYear()))].sort((a, b) => b - a);
+    const anosDisponiveis = [...new Set(finance.map((f) => parseLocalDate(f.date).getFullYear()))].sort(
+        (a, b) => b - a
+    );
 
     const anoSelecionadoAnteriormente = yearFilter.value;
     yearFilter.innerHTML = "";
@@ -320,7 +267,7 @@ function renderDashboard(students, finance) {
     }
 
     function processarDadosFinanceiros(ano) {
-        const financeAno = finance.filter((f) => new Date(f.date).getFullYear() === Number(ano));
+        const financeAno = finance.filter((f) => parseLocalDate(f.date).getFullYear() === Number(ano));
 
         const totalIn = financeAno.filter((f) => f.type === "Entrada").reduce((a, b) => a + Number(b.amount || 0), 0);
         const totalOut = financeAno.filter((f) => f.type === "Saída").reduce((a, b) => a + Number(b.amount || 0), 0);
@@ -332,7 +279,7 @@ function renderDashboard(students, finance) {
         const saldosMensais = Array(12).fill(0);
 
         financeAno.forEach((f) => {
-            const mes = new Date(f.date).getMonth();
+            const mes = parseLocalDate(f.date).getMonth();
             const valor = Number(f.amount || 0);
             if (f.type === "Entrada") saldosMensais[mes] += valor;
             else saldosMensais[mes] -= valor;
@@ -397,12 +344,12 @@ function renderDashboard(students, finance) {
 
     processarDadosFinanceiros(yearFilter.value);
 
-    yearFilter.removeEventListener("change", handleYearChange);
-    yearFilter.addEventListener("change", handleYearChange);
-
     function handleYearChange(e) {
         processarDadosFinanceiros(e.target.value);
     }
+
+    yearFilter.removeEventListener("change", handleYearChange);
+    yearFilter.addEventListener("change", handleYearChange);
 
     const turmasContagem = {};
 
@@ -462,6 +409,7 @@ function renderDashboard(students, finance) {
     }
 }
 
+/* RENDERIZAR E FILTRAR MEMBROS */
 function filterAndRenderStudents() {
     const searchTerm = (document.getElementById("student-search-input").value || "").toLowerCase().trim();
 
@@ -509,6 +457,140 @@ function renderStudents(students) {
     });
 }
 
+function fillModalStudent(s) {
+    const idField = document.getElementById("student-id");
+    if (idField) idField.value = s.id || "";
+
+    document.getElementById("student-status").value = s.status || "Ativo";
+    document.getElementById("student-name").value = s.name || "";
+    document.getElementById("student-dob").value = s.dob ? parseLocalDate(s.dob).toISOString().split("T")[0] : "";
+    document.getElementById("student-rg").value = s.rg || "";
+    document.getElementById("student-financial").value = s.financial || "Dízimo";
+
+    document.getElementById("student-mother").value = s.mother || "";
+    document.getElementById("student-father").value = s.father || "";
+    document.getElementById("student-class").value = s.class || "";
+
+    document.getElementById("student-cep").value = s.cep || "";
+    document.getElementById("student-street").value = s.street || "";
+    document.getElementById("student-number").value = s.number || "";
+    document.getElementById("student-neighborhood").value = s.neighborhood || "";
+    document.getElementById("student-city").value = s.city || "";
+    document.getElementById("student-uf").value = s.uf || "";
+
+    document.getElementById("student-notes").value = s.notes || "";
+}
+
+function setModalFieldsDisabled(disabled) {
+    const form = document.getElementById("form-student");
+    const elements = form.querySelectorAll("input, select, textarea");
+
+    elements.forEach((el) => {
+        if (el.id !== "student-id") {
+            el.disabled = disabled;
+        }
+    });
+}
+
+async function viewStudent(id) {
+    try {
+        const students = await apiGet("Membros");
+        const student = students.find((s) => String(s.id) === String(id));
+
+        if (!student) {
+            alert("Membro não encontrado na base de dados.");
+            return;
+        }
+
+        fillModalStudent(student);
+        setModalFieldsDisabled(true);
+
+        document.querySelector("#modalStudent .modal-title").textContent = `Visualizar Cadastro: ${student.name}`;
+        document.querySelector('#form-student button[type="submit"]').style.display = "none";
+
+        modalStudent.show();
+    } catch (e) {
+        console.error("Erro ao visualizar membro:", e);
+        alert("Erro ao carregar dados do membro.");
+    }
+}
+
+async function editStudent(id) {
+    try {
+        const students = await apiGet("Membros");
+        const student = students.find((s) => String(s.id) === String(id));
+
+        if (!student) {
+            alert("Membro não encontrado para edição.");
+            return;
+        }
+
+        fillModalStudent(student);
+        setModalFieldsDisabled(false);
+
+        document.querySelector("#modalStudent .modal-title").textContent = `Editar Cadastro: ${student.name}`;
+        document.querySelector('#form-student button[type="submit"]').style.display = "block";
+
+        modalStudent.show();
+    } catch (e) {
+        console.error("Erro ao editar membro:", e);
+        alert("Erro ao carregar dados para edição.");
+    }
+}
+
+document.getElementById("btn-new-student").addEventListener("click", () => {
+    const form = document.getElementById("form-student");
+    if (!form) return;
+
+    form.reset();
+    document.getElementById("student-id").value = "";
+
+    document.querySelector("#modalStudent .modal-title").textContent = "Cadastrar Membro";
+    document.querySelector('#form-student button[type="submit"]').style.display = "block";
+    setModalFieldsDisabled(false);
+
+    modalStudent.show();
+});
+
+document.getElementById("form-student").addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const currentId = document.getElementById("student-id").value;
+    const studentId = currentId ? currentId : uid();
+    const actionType = currentId ? "update" : "create";
+
+    const newS = {
+        id: studentId,
+        status: document.getElementById("student-status").value,
+        name: document.getElementById("student-name").value,
+        dob: document.getElementById("student-dob").value,
+        rg: document.getElementById("student-rg").value,
+        financial: document.getElementById("student-financial").value,
+        father: document.getElementById("student-father").value,
+        mother: document.getElementById("student-mother").value,
+        cep: document.getElementById("student-cep").value,
+        street: document.getElementById("student-street").value,
+        number: document.getElementById("student-number").value,
+        neighborhood: document.getElementById("student-neighborhood").value,
+        city: document.getElementById("student-city").value,
+        uf: document.getElementById("student-uf").value,
+        class: document.getElementById("student-class").value,
+        notes: document.getElementById("student-notes").value,
+    };
+
+    await apiPost("Membros", actionType, newS);
+    modalStudent.hide();
+    renderApp();
+});
+
+async function deleteStudent(id) {
+    if (confirm("Deseja realmente remover este membro do Google Sheets?")) {
+        await apiPost("Membros", "delete", id);
+        renderApp();
+    }
+}
+
+/* GESTÃO FINANCEIRA */
 async function populateTxStudentSelect(selectedValue = "") {
     const students = await apiGet("Membros");
     const select = document.getElementById("tx-student-link");
@@ -525,7 +607,7 @@ async function populateTxStudentSelect(selectedValue = "") {
 
 function fillModalTx(t) {
     document.getElementById("tx-id").value = t.id || "";
-    document.getElementById("tx-date").value = t.date ? t.date.split("T")[0] : "";
+    document.getElementById("tx-date").value = t.date ? parseLocalDate(t.date).toISOString().split("T")[0] : "";
     document.getElementById("tx-type").value = t.type || "Entrada";
     document.getElementById("tx-category").value = t.category || "";
     document.getElementById("tx-method").value = t.method || "Dinheiro";
@@ -543,7 +625,6 @@ function setTxModalFieldsDisabled(disabled) {
 }
 
 async function viewTx(id) {
-    showLoading(true);
     try {
         const finance = await apiGet("Financas");
         const tx = finance.find((f) => String(f.id) === String(id));
@@ -565,13 +646,10 @@ async function viewTx(id) {
     } catch (e) {
         console.error("Erro ao visualizar lançamento:", e);
         alert("Erro ao carregar dados do lançamento.");
-    } finally {
-        showLoading(false);
     }
 }
 
 async function editTx(id) {
-    showLoading(true);
     try {
         const finance = await apiGet("Financas");
         const tx = finance.find((f) => String(f.id) === String(id));
@@ -593,12 +671,8 @@ async function editTx(id) {
     } catch (e) {
         console.error("Erro ao editar lançamento:", e);
         alert("Erro ao carregar lançamento para edição.");
-    } finally {
-        showLoading(false);
     }
 }
-
-let globalFinanceCache = [];
 
 function filterAndRenderFinance() {
     const monthVal = document.getElementById("fin-filter-month").value;
@@ -608,9 +682,11 @@ function filterAndRenderFinance() {
     const filtered = globalFinanceCache.filter((t) => {
         if (!t.date) return false;
 
-        const [year, month, day] = t.date.split("T")[0].split("-").map(Number);
+        const txDate = parseLocalDate(t.date);
+        const month = txDate.getMonth();
+        const year = txDate.getFullYear();
 
-        if (monthVal !== "" && month - 1 !== Number(monthVal)) {
+        if (monthVal !== "" && month !== Number(monthVal)) {
             return false;
         }
 
@@ -619,7 +695,7 @@ function filterAndRenderFinance() {
         }
 
         if (exactDateVal) {
-            const formattedTxDate = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+            const formattedTxDate = txDate.toISOString().split("T")[0];
             if (formattedTxDate !== exactDateVal) {
                 return false;
             }
@@ -683,11 +759,13 @@ function renderFinance(finance) {
         return;
     }
 
-    finance.sort((a, b) => new Date(b.date) - new Date(a.date));
+    finance.sort((a, b) => parseLocalDate(b.date) - parseLocalDate(a.date));
 
     finance.forEach((t) => {
-        const dateParts = t.date ? t.date.split("T")[0].split("-") : null;
-        const formattedDate = dateParts ? `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}` : "-";
+        const dt = t.date ? parseLocalDate(t.date) : null;
+        const formattedDate = dt
+            ? `${String(dt.getDate()).padStart(2, "0")}/${String(dt.getMonth() + 1).padStart(2, "0")}/${dt.getFullYear()}`
+            : "-";
 
         const isIncome = t.type === "Entrada";
         const typeIcon = isIncome ? "bi-arrow-up-circle-fill" : "bi-arrow-down-circle-fill";
@@ -724,6 +802,51 @@ function renderFinance(finance) {
     });
 }
 
+document.getElementById("btn-new-transaction").addEventListener("click", async () => {
+    await populateTxStudentSelect();
+    document.getElementById("form-transaction").reset();
+    document.getElementById("tx-id").value = "";
+    document.getElementById("tx-date").valueAsDate = new Date();
+
+    setTxModalFieldsDisabled(false);
+    document.querySelector("#modalTransaction .modal-title").textContent = "Novo Lançamento Financeiro";
+    document.querySelector('#form-transaction button[type="submit"]').style.display = "block";
+
+    modalTx.show();
+});
+
+document.getElementById("form-transaction").addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const currentId = document.getElementById("tx-id").value;
+    const isUpdate = Boolean(currentId);
+    const txId = isUpdate ? currentId : uid();
+    const actionType = isUpdate ? "update" : "create";
+
+    const newT = {
+        id: txId,
+        code: isUpdate ? undefined : Math.floor(100 + Math.random() * 900),
+        date: document.getElementById("tx-date").value,
+        type: document.getElementById("tx-type").value,
+        category: document.getElementById("tx-category").value,
+        student: document.getElementById("tx-student-link").value,
+        method: document.getElementById("tx-method").value,
+        amount: parseFloat(document.getElementById("tx-amount").value),
+    };
+
+    await apiPost("Financas", actionType, newT);
+    modalTx.hide();
+    renderApp();
+});
+
+async function deleteTx(id) {
+    if (confirm("Deseja realmente excluir esta transação?")) {
+        await apiPost("Financas", "delete", id);
+        renderApp();
+    }
+}
+
+/* RELATÓRIOS */
 function renderReports(finance) {
     const tbodyIn = document.querySelector("#table-report-incomes tbody");
     const tbodyOut = document.querySelector("#table-report-expenses tbody");
@@ -805,102 +928,7 @@ function printReportLandscape() {
     window.print();
 }
 
-document.getElementById("btn-new-student").addEventListener("click", () => {
-    const form = document.getElementById("form-student");
-    if (!form) return;
-
-    form.reset();
-    document.getElementById("student-id").value = "";
-
-    document.querySelector("#modalStudent .modal-title").textContent = "Cadastrar Membro";
-    document.querySelector('#form-student button[type="submit"]').style.display = "block";
-    setModalFieldsDisabled(false);
-
-    modalStudent.show();
-});
-
-document.getElementById("form-student").addEventListener("submit", async (e) => {
-    e.preventDefault();
-
-    const currentId = document.getElementById("student-id").value;
-    const studentId = currentId ? currentId : uid();
-    const actionType = currentId ? "update" : "create";
-
-    const newS = {
-        id: studentId,
-        status: document.getElementById("student-status").value,
-        name: document.getElementById("student-name").value,
-        dob: document.getElementById("student-dob").value,
-        rg: document.getElementById("student-rg").value,
-        financial: document.getElementById("student-financial").value,
-        father: document.getElementById("student-father").value,
-        mother: document.getElementById("student-mother").value,
-        cep: document.getElementById("student-cep").value,
-        street: document.getElementById("student-street").value,
-        number: document.getElementById("student-number").value,
-        neighborhood: document.getElementById("student-neighborhood").value,
-        city: document.getElementById("student-city").value,
-        uf: document.getElementById("student-uf").value,
-        class: document.getElementById("student-class").value,
-        notes: document.getElementById("student-notes").value,
-    };
-
-    await apiPost("Membros", actionType, newS);
-    modalStudent.hide();
-    renderApp();
-});
-
-document.getElementById("btn-new-transaction").addEventListener("click", async () => {
-    await populateTxStudentSelect();
-    document.getElementById("form-transaction").reset();
-    document.getElementById("tx-id").value = "";
-    document.getElementById("tx-date").valueAsDate = new Date();
-
-    setTxModalFieldsDisabled(false);
-    document.querySelector("#modalTransaction .modal-title").textContent = "Novo Lançamento Financeiro";
-    document.querySelector('#form-transaction button[type="submit"]').style.display = "block";
-
-    modalTx.show();
-});
-
-document.getElementById("form-transaction").addEventListener("submit", async (e) => {
-    e.preventDefault();
-
-    const currentId = document.getElementById("tx-id").value;
-    const isUpdate = Boolean(currentId);
-    const txId = isUpdate ? currentId : uid();
-    const actionType = isUpdate ? "update" : "create";
-
-    const newT = {
-        id: txId,
-        code: isUpdate ? undefined : Math.floor(100 + Math.random() * 900),
-        date: document.getElementById("tx-date").value,
-        type: document.getElementById("tx-type").value,
-        category: document.getElementById("tx-category").value,
-        student: document.getElementById("tx-student-link").value,
-        method: document.getElementById("tx-method").value,
-        amount: parseFloat(document.getElementById("tx-amount").value),
-    };
-
-    await apiPost("Financas", actionType, newT);
-    modalTx.hide();
-    renderApp();
-});
-
-async function deleteStudent(id) {
-    if (confirm("Deseja realmente remover este membro do Google Sheets?")) {
-        await apiPost("Membros", "delete", id);
-        renderApp();
-    }
-}
-
-async function deleteTx(id) {
-    if (confirm("Deseja realmente excluir esta transação?")) {
-        await apiPost("Financas", "delete", id);
-        renderApp();
-    }
-}
-
+/* INICIALIZAÇÃO */
 if (sessionStorage.getItem("giar_active_user")) {
     document.body.classList.remove("unauthenticated");
     renderApp();
