@@ -3,15 +3,477 @@
     <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>GIAR - Gestão Integrada de Atividade Religiosa</title>
+        <title>GIAR</title>
 
         <!-- CDNs Bootstrap 5 & Ícones -->
         <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
-
         <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet" />
-        <link rel="stylesheet" href="style.css" />
+
         <!-- Bibliotecas de Gráficos -->
         <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+        <link rel="stylesheet" href="style.css" />
+        <style>
+            :root {
+                /* PALETA DE CORES MODERNA E SUAVE */
+                --brand-dark: #1e293b; /* Slate 800 */
+                --brand-medium: #334155; /* Slate 700 */
+                --brand-accent: #3b82f6; /* Blue 500 suave */
+                --gold-light: #eab308; /* Amarelo dourado elegante */
+                --gold-soft: #fef08a; /* Amarelo claro suave */
+                --white: #ffffff;
+                --green: #10b981; /* Emerald 500 */
+                --red: #ef4444; /* Red 500 */
+                --ink: #0f172a; /* Slate 900 */
+                --muted: #64748b; /* Slate 500 */
+                --bg: #f8fafc; /* Slate 50 ultra suave */
+                --border: #e2e8f0; /* Slate 200 */
+                --shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.08), 0 8px 10px -6px rgba(15, 23, 42, 0.04);
+                --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.06), 0 1px 2px -1px rgba(0, 0, 0, 0.04);
+                --nav-text: #f1f5f9;
+
+                /* Compatibilidade */
+                --primary-color: var(--brand-dark);
+                --secondary-color: var(--brand-accent);
+                --accent-pink: var(--brand-accent);
+                --footer-bg: var(--brand-dark);
+                --table-head: var(--brand-dark);
+            }
+
+            html,
+            body {
+                height: 100%;
+            }
+
+            body {
+                margin: 0;
+                font-family:
+                    "Inter",
+                    system-ui,
+                    -apple-system,
+                    "Segoe UI",
+                    Roboto,
+                    sans-serif;
+                color: var(--ink);
+                background: var(--bg);
+                padding-top: 88px;
+                padding-bottom: 88px;
+            }
+
+            /* Overlay de Loading */
+            #loading-overlay {
+                position: fixed;
+                inset: 0;
+                background: rgba(255, 255, 255, 0.85);
+                backdrop-filter: blur(4px);
+                z-index: 2000;
+                display: none;
+                align-items: center;
+                justify-content: center;
+            }
+
+            #loading-overlay .spinner-border {
+                color: var(--brand-accent) !important;
+            }
+
+            /* Controle de login */
+            .unauthenticated .navbar-custom,
+            .unauthenticated .container,
+            .unauthenticated footer.footer-fixed {
+                display: none !important;
+            }
+
+            .unauthenticated #modalLogin {
+                display: block !important;
+                visibility: visible !important;
+                opacity: 1 !important;
+                padding-top: 0;
+                padding-bottom: 0;
+                background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%) !important;
+            }
+
+            .unauthenticated body {
+                padding-top: 0;
+                padding-bottom: 0;
+                background: #0f172a;
+            }
+
+            /* Barra superior */
+            .navbar-custom {
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                z-index: 1060;
+                min-height: 72px;
+                background: rgba(30, 41, 59, 0.95);
+                backdrop-filter: blur(8px);
+                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+                display: flex;
+                align-items: center;
+            }
+
+            .navbar-custom .navbar-brand {
+                color: var(--white);
+                font-weight: 600;
+                letter-spacing: -0.2px;
+            }
+
+            .navbar-custom .navbar-brand i {
+                color: var(--gold-light) !important;
+                filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+            }
+
+            .navbar-custom .nav-link {
+                color: var(--nav-text) !important;
+                border-radius: 8px;
+                padding: 8px 14px;
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+                transition: all 0.2s ease;
+                font-weight: 500;
+                font-size: 0.92rem;
+            }
+
+            .navbar-custom .nav-link:hover {
+                background: rgba(255, 255, 255, 0.08);
+                color: #fff !important;
+            }
+
+            .navbar-custom .nav-link.active {
+                background: rgba(255, 255, 255, 0.15);
+                color: #fff !important;
+                font-weight: 600;
+                box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+            }
+
+            .navbar-custom .small-muted {
+                color: rgba(255, 255, 255, 0.7) !important;
+                font-size: 0.85rem;
+            }
+
+            .modal {
+                z-index: 1200 !important;
+            }
+
+            /* Área principal */
+            .container.py-4 {
+                max-width: 1400px;
+            }
+
+            .tab-pane {
+                animation: pageIn 0.25s ease-out;
+            }
+
+            @keyframes pageIn {
+                from {
+                    opacity: 0;
+                    transform: translateY(6px);
+                }
+                to {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
+            }
+
+            /* Cards */
+            .card-clean {
+                background: var(--white);
+                border: 1px solid var(--border);
+                border-radius: 16px;
+                padding: 20px;
+                box-shadow: var(--shadow-sm);
+                transition: all 0.2s ease;
+            }
+
+            .card-clean:hover {
+                box-shadow: var(--shadow);
+            }
+
+            .card-clean h5,
+            .card-clean h6 {
+                color: var(--brand-dark);
+                font-weight: 700;
+                letter-spacing: -0.3px;
+            }
+
+            .card-clean h5 i,
+            .card-clean h6 i,
+            .text-primary {
+                color: var(--brand-accent) !important;
+            }
+
+            .summary-card {
+                border-radius: 14px;
+                padding: 18px;
+                color: #fff;
+                min-height: 90px;
+                box-shadow: var(--shadow-sm);
+                position: relative;
+                overflow: hidden;
+                border: 0;
+            }
+
+            .summary-card::after {
+                content: "";
+                position: absolute;
+                width: 100px;
+                height: 100px;
+                right: -20px;
+                top: -20px;
+                border-radius: 50%;
+                background: rgba(255, 255, 255, 0.08);
+            }
+
+            .summary-value {
+                font-weight: 700;
+                font-size: 1.35rem;
+                margin-top: 4px;
+                letter-spacing: -0.5px;
+            }
+
+            .summary-card[style*="#ff7ab6"] {
+                background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
+            }
+
+            .summary-card[style*="#4bc0ff"] {
+                background: linear-gradient(135deg, #64748b 0%, #475569 100%) !important;
+            }
+
+            .summary-card[style*="#2ecc71"] {
+                background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+            }
+
+            .card-clean[style*="var(--primary-color)"] {
+                background: linear-gradient(135deg, var(--brand-dark), var(--brand-medium)) !important;
+                border-color: transparent !important;
+            }
+
+            /* Tabelas */
+            .table-fin thead th,
+            .table-dizimo thead th {
+                background: #f1f5f9;
+                color: var(--brand-dark);
+                vertical-align: middle;
+                border-color: var(--border);
+                font-size: 0.78rem;
+                font-weight: 700;
+                letter-spacing: 0.03em;
+                white-space: nowrap;
+                text-transform: uppercase;
+            }
+
+            .table {
+                --bs-table-border-color: var(--border);
+            }
+
+            .table > :not(caption) > * > * {
+                padding: 0.8rem 0.75rem;
+            }
+
+            .table tbody tr:hover {
+                --bs-table-hover-bg: #f8fafc;
+            }
+
+            .table thead.table-light th {
+                background: #f1f5f9;
+                color: var(--brand-dark);
+                border-bottom: 2px solid var(--border);
+            }
+
+            /* Badges */
+            .badge {
+                font-weight: 600;
+                padding: 0.4em 0.75em;
+                border-radius: 6px;
+            }
+
+            .badge.bg-success {
+                background-color: #d1fae5 !important;
+                color: #065f46 !important;
+            }
+
+            .badge.bg-danger {
+                background-color: #fee2e2 !important;
+                color: #991b1b !important;
+            }
+
+            .badge.bg-warning {
+                background-color: #fef3c7 !important;
+                color: #92400e !important;
+            }
+
+            .badge.bg-info {
+                background-color: #e0f2fe !important;
+                color: #075985 !important;
+            }
+
+            .badge.bg-secondary {
+                background-color: #f1f5f9 !important;
+                color: #475569 !important;
+            }
+
+            .badge.bg-pink {
+                background-color: #e0e7ff !important;
+                color: #3730a3 !important;
+            }
+
+            /* Botões */
+            .btn {
+                border-radius: 10px;
+                font-weight: 600;
+                padding: 0.5rem 1rem;
+                transition: all 0.15s ease;
+            }
+
+            .btn-pink {
+                background: var(--brand-accent);
+                border-color: var(--brand-accent);
+                color: #fff;
+                box-shadow: 0 2px 6px rgba(59, 130, 246, 0.25);
+            }
+
+            .btn-pink:hover,
+            .btn-pink:focus {
+                background: #2563eb;
+                border-color: #2563eb;
+                color: #fff;
+                transform: translateY(-1px);
+                box-shadow: 0 4px 12px rgba(59, 130, 246, 0.35);
+            }
+
+            .btn-info {
+                background: var(--brand-medium) !important;
+                border-color: var(--brand-medium) !important;
+                color: #fff !important;
+            }
+
+            .btn-outline-danger {
+                color: var(--red);
+                border-color: #fca5a5;
+            }
+
+            .btn-outline-danger:hover {
+                background: var(--red);
+                border-color: var(--red);
+                color: #fff;
+            }
+
+            /* Formulários */
+            .form-control,
+            .form-select {
+                border: 1px solid var(--border);
+                border-radius: 10px;
+                min-height: 42px;
+                color: var(--ink);
+                background-color: #fff;
+                font-size: 0.95rem;
+            }
+
+            .form-control:focus,
+            .form-select:focus {
+                border-color: var(--brand-accent);
+                box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+            }
+
+            .form-label {
+                color: var(--brand-dark);
+                font-weight: 600;
+                font-size: 0.88rem;
+                margin-bottom: 0.4rem;
+            }
+
+            .small-muted {
+                color: var(--muted);
+                font-size: 0.88rem;
+            }
+
+            /* Modal */
+            .modal-content {
+                border: 0;
+                border-radius: 18px;
+                overflow: hidden;
+                box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            }
+
+            .modal-header {
+                background: #f8fafc;
+                border-bottom: 1px solid var(--border);
+                padding: 1.25rem 1.5rem;
+            }
+
+            .modal-title {
+                color: var(--brand-dark);
+                font-weight: 700;
+            }
+
+            #modalLogin .modal-content {
+                border-top: 4px solid var(--gold-light);
+            }
+
+            #modalLogin .modal-header {
+                background: linear-gradient(135deg, var(--brand-dark), var(--brand-medium));
+            }
+
+            #modalLogin .modal-title {
+                color: #fff;
+            }
+
+            #modalLogin .modal-header small {
+                color: rgba(255, 255, 255, 0.75) !important;
+            }
+
+            #modalLogin .modal-body {
+                padding: 1.8rem !important;
+            }
+
+            /* Relatórios */
+            #table-report thead th {
+                background: var(--brand-dark);
+                color: #fff;
+            }
+
+            /* Rodapé */
+            footer.footer-fixed {
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                min-height: 60px;
+                background: var(--brand-dark);
+                border-top: 1px solid rgba(255, 255, 255, 0.1);
+                color: rgba(255, 255, 255, 0.75);
+                z-index: 1040;
+                display: flex;
+                align-items: center;
+                font-size: 0.85rem;
+            }
+
+            /* Impressão */
+            @media print {
+                @page {
+                    size: landscape;
+                    margin: 1cm;
+                }
+                .top-bar,
+                .nav-tabs,
+                .btn,
+                footer,
+                .navbar-custom {
+                    display: none !important;
+                }
+                body {
+                    background: #ffffff !important;
+                    padding: 0 !important;
+                }
+                .card-clean,
+                .card {
+                    border: none !important;
+                    box-shadow: none !important;
+                }
+            }
+        </style>
     </head>
     <body class="unauthenticated">
         <!-- Overlay de Carregamento -->
@@ -25,7 +487,7 @@
         <nav class="navbar navbar-expand-lg navbar-custom">
             <div class="container-fluid">
                 <a class="navbar-brand d-flex align-items-center gap-2" href="#">
-                    <span class="brand-mark"><i class="bi bi-journal-bookmark-fill text-white fs-3"></i></span>
+                    <span class="brand-mark"><i class="bi bi-journal-bookmark-fill fs-4"></i></span>
                     <span style="font-weight: 700; color: var(--nav-text); font-size: 1.05rem"
                         >GIAR - AD Cetro de Justiça</span
                     >
@@ -48,6 +510,11 @@
                             >
                         </li>
                         <li class="nav-item">
+                            <a class="nav-link" data-bs-toggle="tab" data-bs-target="#dizimistas" role="tab"
+                                ><i class="bi bi-calendar-check-fill"></i> Gabarito de Dizimistas</a
+                            >
+                        </li>
+                        <li class="nav-item">
                             <a class="nav-link" data-bs-toggle="tab" data-bs-target="#finance" role="tab"
                                 ><i class="bi bi-cash-coin"></i> Finanças & Caixa</a
                             >
@@ -61,12 +528,12 @@
 
                     <div class="d-flex align-items-center gap-3">
                         <div class="text-white small-muted d-none d-xl-block">
-                            <i class="bi bi-envelope-fill"></i> giar@gmail.com
+                            <i class="bi bi-envelope-fill"></i> sgiarcj@gmail.com
                         </div>
                         <div id="user-area" class="text-white fw-semibold">
                             <i class="bi bi-person-circle"></i> <span id="user-name">Usuário</span>
                         </div>
-                        <button class="btn btn-outline-light btn-sm" id="btn-logout" title="Sair">
+                        <button class="btn btn-outline-light btn-sm rounded-pill" id="btn-logout" title="Sair">
                             <i class="bi bi-box-arrow-right"></i>
                         </button>
                     </div>
@@ -223,6 +690,135 @@
                                         <th>Contribuição</th>
                                         <th>Cidade/UF</th>
                                         <th class="text-end">Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- GABARITO DE DIZIMISTAS -->
+                <div class="tab-pane fade" id="dizimistas" role="tabpanel">
+                    <div class="card-clean mb-3 p-3">
+                        <div
+                            class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-3"
+                        >
+                            <h5 class="mb-0">
+                                <i class="bi bi-calendar-check-fill me-2 text-primary"></i>Gabarito Mensal de Dizimistas
+                            </h5>
+                            <button class="btn btn-outline-primary btn-sm" onclick="window.print()">
+                                <i class="bi bi-printer me-1"></i>Imprimir Relatório
+                            </button>
+                        </div>
+
+                        <!-- FILTROS DO GABARITO -->
+                        <div class="row g-2 mb-3 bg-light p-3 rounded align-items-end">
+                            <div class="col-6 col-md-3">
+                                <label for="diz-filter-year" class="form-label small mb-1">Ano Exercício:</label>
+                                <select id="diz-filter-year" class="form-select form-select-sm">
+                                    <option value="2024">2024</option>
+                                    <option value="2025">2025</option>
+                                    <option value="2026" selected>2026</option>
+                                    <option value="2027">2027</option>
+                                </select>
+                            </div>
+
+                            <div class="col-6 col-md-3">
+                                <label for="diz-filter-month" class="form-label small mb-1">Mês Específico:</label>
+                                <select id="diz-filter-month" class="form-select form-select-sm">
+                                    <option value="all">Todos os Meses (Visão Geral/Gabarito)</option>
+                                    <option value="0">Janeiro</option>
+                                    <option value="1">Fevereiro</option>
+                                    <option value="2">Março</option>
+                                    <option value="3">Abril</option>
+                                    <option value="4">Maio</option>
+                                    <option value="5">Junho</option>
+                                    <option value="6">Julho</option>
+                                    <option value="7">Agosto</option>
+                                    <option value="8">Setembro</option>
+                                    <option value="9">Outubro</option>
+                                    <option value="10">Novembro</option>
+                                    <option value="11">Dezembro</option>
+                                </select>
+                            </div>
+
+                            <div class="col-6 col-md-3">
+                                <label for="diz-filter-status" class="form-label small mb-1"
+                                    >Status Contribuição:</label
+                                >
+                                <select id="diz-filter-status" class="form-select form-select-sm">
+                                    <option value="all">Todos os Cadastrados</option>
+                                    <option value="paid">Contribuiu (Sim)</option>
+                                    <option value="unpaid">Não Contribuiu (Não)</option>
+                                </select>
+                            </div>
+
+                            <div class="col-6 col-md-3">
+                                <label for="diz-filter-search" class="form-label small mb-1">Buscar por Nome:</label>
+                                <input
+                                    type="text"
+                                    id="diz-filter-search"
+                                    class="form-control form-control-sm"
+                                    placeholder="Nome do dizimista..."
+                                />
+                            </div>
+                        </div>
+
+                        <!-- CARDS RESUMO DO GABARITO -->
+                        <div class="row g-2 mb-3">
+                            <div class="col-6 col-md-3">
+                                <div class="p-2 border rounded bg-light text-center">
+                                    <small class="text-muted d-block">Dizimistas Cadastrados</small>
+
+                                    <span class="fs-5 fw-bold text-dark" id="diz-stat-total">0</span>
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="p-2 border rounded bg-light text-center">
+                                    <small class="text-muted d-block">Contribuíram no Período</small>
+
+                                    <span class="fs-5 fw-bold text-success" id="diz-stat-paid">0</span>
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="p-2 border rounded bg-light text-center">
+                                    <small class="text-muted d-block">Sem Contribuição</small>
+
+                                    <span class="fs-5 fw-bold text-danger" id="diz-stat-unpaid">0</span>
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="p-2 border rounded bg-light text-center">
+                                    <small class="text-muted d-block">Total Arrecadado (Dízimos)</small>
+
+                                    <span class="fs-5 fw-bold text-primary" id="diz-stat-amount">R$ 0,00</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- TABELA / GABARITO -->
+                        <div class="table-responsive">
+                            <table
+                                class="table table-hover table-bordered table-dizimo mb-0 align-middle text-center"
+                                id="table-dizimistas"
+                            >
+                                <thead>
+                                    <tr id="diz-table-header">
+                                        <th class="text-start">NOME DO DIZIMISTA</th>
+                                        <th>JAN</th>
+                                        <th>FEV</th>
+                                        <th>MAR</th>
+                                        <th>ABR</th>
+                                        <th>MAI</th>
+                                        <th>JUN</th>
+                                        <th>JUL</th>
+                                        <th>AGO</th>
+                                        <th>SET</th>
+                                        <th>OUT</th>
+                                        <th>NOV</th>
+                                        <th>DEZ</th>
+                                        <th>TOTAL</th>
                                     </tr>
                                 </thead>
                                 <tbody></tbody>
@@ -449,27 +1045,16 @@
                         <div class="modal-header bg-primary text-white text-center d-block">
                             <h5 class="modal-title">AD Cetro de Justiça</h5>
                             <small class="text-white-50">GIAR - Gestão Integrada de Atividade Religiosa</small>
+                            <small class="text-white-50">Sistema Sustentável</small>
                         </div>
                         <div class="modal-body p-4">
                             <div class="mb-3">
                                 <label class="form-label">E-mail Institucional</label>
-                                <input
-                                    type="email"
-                                    class="form-control"
-                                    id="login-email"
-                                    value="giar@gmail.com"
-                                    required
-                                />
+                                <input type="email" class="form-control" id="login-email" value="" required />
                             </div>
                             <div class="mb-3">
                                 <label class="form-label">Senha</label>
-                                <input
-                                    type="password"
-                                    class="form-control"
-                                    id="login-password"
-                                    value="123456"
-                                    required
-                                />
+                                <input type="password" class="form-control" id="login-password" value="" required />
                             </div>
 
                             <div
@@ -669,10 +1254,10 @@
 
         <footer class="footer-fixed">
             <div class="container-fluid text-center">
-                GIAR &copy; Igreja Assembléia de Deus Cetro de Justiça - E-mail: giar@gmail.com
+                GIAR 2026 &copy; Igreja Assembléia de Deus Cetro de Justiça - Desenvolvido por: Rafael Sabino Dos Santos
             </div>
         </footer>
-
+        <!-- Projeto FMU - Rafael Sabino Dos Santos -->
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
         <script src="./script.js" defer></script>
     </body>
