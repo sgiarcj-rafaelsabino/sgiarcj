@@ -17,58 +17,50 @@ let financeChart = null;
 let classChart = null;
 let globalStudentsCache = [];
 
-async function apiGet(sheetName) {
-    showLoading(true);
-    try {
-        const url = `${API_URL}?action=read&sheet=${encodeURIComponent(sheetName)}`;
-        const res = await fetch(url, {
-            method: "GET",
-            mode: "cors",
-            redirect: "follow",
-        });
+function apiGet(sheetName) {
+  return new Promise((resolve, reject) => {
+    const callbackName = 'jsonp_callback_' + Math.round(100000 * Math.random());
+    
+    // Define a função de callback global temporária
+    window[callbackName] = function(data) {
+      delete window[callbackName];
+      document.body.removeChild(script);
+      if (data && data.error) {
+        reject(data.error);
+      } else {
+        resolve(Array.isArray(data) ? data : []);
+      }
+    };
 
-        if (!res.ok) {
-            throw new Error(`Erro na requisição: ${res.statusText}`);
-        }
-
-        const data = await res.json();
-        return Array.isArray(data) ? data : [];
-    } catch (err) {
-        console.error("Erro na leitura:", err);
-        return [];
-    } finally {
-        showLoading(false);
-    }
+    const script = document.createElement('script');
+    script.src = `${API_URL}?action=read&sheet=${encodeURIComponent(sheetName)}&callback=${callbackName}`;
+    script.onerror = function() {
+      delete window[callbackName];
+      document.body.removeChild(script);
+      reject(new Error("Falha na requisição JSONP. Verifique as permissões do script."));
+    };
+    
+    document.body.appendChild(script);
+  });
 }
 
-async function apiPost(sheetName, actionType, payload) {
-    showLoading(true);
-    try {
-        const bodyObj = {
-            action: actionType,
-            sheet: sheetName,
-        };
+// Envio/Ações usando POST compatível
+async function apiPost(payload) {
+  try {
+    const res = await fetch(API_URL, {
+      method: "POST",
+      mode: "cors",
+      headers: {
+        "Content-Type": "text/plain;charset=utf-8"
+      },
+      body: JSON.stringify(payload)
+    });
 
-        if (actionType === "create" || actionType === "update") {
-            bodyObj.data = payload;
-            bodyObj.id = payload.id;
-        } else if (actionType === "delete") {
-            bodyObj.id = payload;
-        }
-
-        await fetch(API_URL, {
-            method: "POST",
-            mode: "no-cors",
-            headers: { "Content-Type": "text/plain;charset=utf-8" },
-            body: JSON.stringify(bodyObj),
-        });
-
-        await new Promise((resolve) => setTimeout(resolve, 1500));
-    } catch (err) {
-        console.error("Erro na gravação:", err);
-    } finally {
-        showLoading(false);
-    }
+    return await res.json();
+  } catch (err) {
+    console.error("Erro no apiPost:", err);
+    throw err;
+  }
 }
 
 document.getElementById("form-login").addEventListener("submit", async (e) => {
