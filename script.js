@@ -88,36 +88,37 @@ function apiGet(sheetName) {
 }
 
 async function apiPost(sheetName, actionType, payload) {
-    showLoading(true);
-    try {
-        const bodyObj = {
-            action: actionType,
-            sheet: sheetName,
-        };
+  showLoading(true);
+  try {
+    const bodyObj = { 
+      action: actionType, 
+      sheet: sheetName 
+    };
 
-        if (actionType === "create" || actionType === "update") {
-            bodyObj.data = payload;
-            bodyObj.id = payload.id;
-        } else if (actionType === "delete") {
-            bodyObj.id = payload;
-        }
-
-        await fetch(API_URL, {
-            method: "POST",
-            headers: { "Content-Type": "text/plain;charset=utf-8" },
-            body: JSON.stringify(bodyObj),
-            redirect: "follow",
-        });
-
-        // Aguarda 1.5 segundos para garantir que o Google Apps Script processe a gravação
-        await new Promise((r) => setTimeout(r, 1500));
-        return { success: true };
-    } catch (err) {
-        console.error("Erro no apiPost:", err);
-        throw err;
-    } finally {
-        showLoading(false);
+    if (actionType === 'create' || actionType === 'update') {
+      bodyObj.data = payload;
+      bodyObj.id = payload.id;
+    } else if (actionType === 'delete') {
+      bodyObj.id = payload;
     }
+
+    // Modo no-cors e text/plain evita bloqueios do Google Apps Script
+    await fetch(API_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(bodyObj)
+    });
+
+    // Tempo de espera para o Google Apps Script gravar a alteração na planilha
+    await new Promise(r => setTimeout(r, 1500));
+    return { success: true };
+  } catch (err) {
+    console.error("Erro no apiPost:", err);
+    throw err;
+  } finally {
+    showLoading(false);
+  }
 }
 
 /* EVENTOS DE AUTENTICAÇÃO E NAVEGAÇÃO */
