@@ -18,49 +18,49 @@ let classChart = null;
 let globalStudentsCache = [];
 
 function apiGet(sheetName) {
-  return new Promise((resolve, reject) => {
-    const callbackName = 'jsonp_callback_' + Math.round(100000 * Math.random());
-    
-    // Define a função de callback global temporária
-    window[callbackName] = function(data) {
-      delete window[callbackName];
-      document.body.removeChild(script);
-      if (data && data.error) {
-        reject(data.error);
-      } else {
-        resolve(Array.isArray(data) ? data : []);
-      }
-    };
+    return new Promise((resolve, reject) => {
+        const callbackName = "jsonp_callback_" + Math.round(100000 * Math.random());
 
-    const script = document.createElement('script');
-    script.src = `${API_URL}?action=read&sheet=${encodeURIComponent(sheetName)}&callback=${callbackName}`;
-    script.onerror = function() {
-      delete window[callbackName];
-      document.body.removeChild(script);
-      reject(new Error("Falha na requisição JSONP. Verifique as permissões do script."));
-    };
-    
-    document.body.appendChild(script);
-  });
+        // Define a função de callback global temporária
+        window[callbackName] = function (data) {
+            delete window[callbackName];
+            document.body.removeChild(script);
+            if (data && data.error) {
+                reject(data.error);
+            } else {
+                resolve(Array.isArray(data) ? data : []);
+            }
+        };
+
+        const script = document.createElement("script");
+        script.src = `${API_URL}?action=read&sheet=${encodeURIComponent(sheetName)}&callback=${callbackName}`;
+        script.onerror = function () {
+            delete window[callbackName];
+            document.body.removeChild(script);
+            reject(new Error("Falha na requisição JSONP. Verifique as permissões do script."));
+        };
+
+        document.body.appendChild(script);
+    });
 }
 
 // Envio/Ações usando POST compatível
 async function apiPost(payload) {
-  try {
-    const res = await fetch(API_URL, {
-      method: "POST",
-      mode: "cors",
-      headers: {
-        "Content-Type": "text/plain;charset=utf-8"
-      },
-      body: JSON.stringify(payload)
-    });
+    try {
+        const res = await fetch(API_URL, {
+            method: "POST",
+            mode: "cors",
+            headers: {
+                "Content-Type": "text/plain;charset=utf-8",
+            },
+            body: JSON.stringify(payload),
+        });
 
-    return await res.json();
-  } catch (err) {
-    console.error("Erro no apiPost:", err);
-    throw err;
-  }
+        return await res.json();
+    } catch (err) {
+        console.error("Erro no apiPost:", err);
+        throw err;
+    }
 }
 
 document.getElementById("form-login").addEventListener("submit", async (e) => {
@@ -249,9 +249,29 @@ function renderDashboard(students, finance) {
     bdaysList.innerHTML = "";
 
     function parseLocalDate(dateStr) {
-        if (!dateStr) return null;
-        const [year, month, day] = dateStr.split("T")[0].split("-").map(Number);
-        return new Date(year, month - 1, day);
+        if (!dateStr) return new Date(); // Retorna a data atual se estiver vazio/null
+
+        // Se já for um objeto Date (muito comum em retornos de planilhas/APIs)
+        if (dateStr instanceof Date) {
+            return dateStr;
+        }
+
+        // Converte explicitamente para String caso seja um número ou outro tipo
+        const str = String(dateStr).trim();
+
+        // Se for uma string no formato ISO ou contendo 'T' (ex: "2026-09-24T00:00:00.000Z")
+        if (str.includes("T")) {
+            return new Date(str);
+        }
+
+        // Se for no formato YYYY-MM-DD
+        if (str.includes("-")) {
+            const parts = str.split("-");
+            return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+        }
+
+        // Fallback genérico para outros formatos
+        return new Date(str);
     }
 
     const monthStudents = students.filter((s) => {
