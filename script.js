@@ -15,15 +15,15 @@ const modalLogin = new bootstrap.Modal(document.getElementById("modalLogin"));
 const modalStudent = new bootstrap.Modal(document.getElementById("modalStudent"));
 const modalTx = new bootstrap.Modal(document.getElementById("modalTransaction"));
 
-// Variáveis globais para os gráficos
+/* Variáveis globais para os gráficos */
 let financeChart = null;
 let classChart = null;
 
-// Variável global para cache da lista de alunos
+/* Variável global para cache da lista de alunos */
 let globalStudentsCache = [];
 let globalFinanceCache = [];
 
-/* FUNÇÕES AUXILIARES DE DATA */
+/* Funções auxiliares de data */
 function parseLocalDate(dateStr) {
     if (!dateStr) return new Date();
 
@@ -57,7 +57,7 @@ function calcularIdade(dataNasc) {
     return idade;
 }
 
-/* FUNÇÕES DE COMUNICAÇÃO COM O APPS SCRIPT (JSONP & POST) */
+/* Funções de comunicação com o APPS SCRIPT (JSONP & POST) */
 function apiGet(sheetName) {
     showLoading(true);
     return new Promise((resolve, reject) => {
@@ -88,39 +88,39 @@ function apiGet(sheetName) {
 }
 
 async function apiPost(sheetName, actionType, payload) {
-  showLoading(true);
-  try {
-    const bodyObj = { 
-      action: actionType, 
-      sheet: sheetName 
-    };
+    showLoading(true);
+    try {
+        const bodyObj = {
+            action: actionType,
+            sheet: sheetName,
+        };
 
-    if (actionType === 'create' || actionType === 'update') {
-      bodyObj.data = payload;
-      bodyObj.id = payload.id;
-    } else if (actionType === 'delete') {
-      bodyObj.id = payload;
+        if (actionType === "create" || actionType === "update") {
+            bodyObj.data = payload;
+            bodyObj.id = payload.id;
+        } else if (actionType === "delete") {
+            bodyObj.id = payload;
+        }
+
+        await fetch(API_URL, {
+            method: "POST",
+            mode: "no-cors" /* Evita bloqueio de CORS com o Apps Script */,
+            headers: { "Content-Type": "text/plain;charset=utf-8" },
+            body: JSON.stringify(bodyObj),
+        });
+
+        /* Aguarda 1.5 segundos para garantir o processamento na planilha */
+        await new Promise((r) => setTimeout(r, 1500));
+        return { success: true };
+    } catch (err) {
+        console.error("Erro no apiPost:", err);
+        throw err;
+    } finally {
+        showLoading(false);
     }
-
-    await fetch(API_URL, {
-      method: 'POST',
-      mode: 'no-cors', // Evita bloqueio de CORS com o Apps Script
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify(bodyObj)
-    });
-
-    // Aguarda 1.5 segundos para garantir o processamento na planilha
-    await new Promise(r => setTimeout(r, 1500));
-    return { success: true };
-  } catch (err) {
-    console.error("Erro no apiPost:", err);
-    throw err;
-  } finally {
-    showLoading(false);
-  }
 }
 
-/* EVENTOS DE AUTENTICAÇÃO E NAVEGAÇÃO */
+/* Eventos de autenticação e navegação */
 document.getElementById("form-login").addEventListener("submit", async (e) => {
     e.preventDefault();
 
@@ -153,7 +153,7 @@ document.getElementById("btn-logout").addEventListener("click", () => {
     modalLogin.show();
 });
 
-/* BUSCA DE CEP */
+/* Busca Cep */
 document.getElementById("student-cep").addEventListener("blur", async (e) => {
     const cep = e.target.value.replace(/\D/g, "");
     if (cep.length === 8) {
@@ -172,7 +172,7 @@ document.getElementById("student-cep").addEventListener("blur", async (e) => {
     }
 });
 
-/* RENDERIZAÇÃO PRINCIPAL */
+/* Rendereização principal */
 async function renderApp() {
     const user = JSON.parse(sessionStorage.getItem("giar_active_user"));
     if (!user) return;
@@ -186,14 +186,178 @@ async function renderApp() {
 
         renderDashboard(students, finance);
         renderStudents(students);
+        renderDizimistasGabarito();
         renderFinance(finance);
+        updateFinanceCards(finance);
         renderReports(finance);
     } catch (err) {
         console.error("Erro ao carregar os dados:", err);
     }
 }
 
-/* RENDERIZAR DASHBOARD */
+/* Rendereizar gabarito de dizimistas */
+function renderDizimistasGabarito() {
+    const selectedYear = Number(document.getElementById("diz-filter-year").value);
+    const selectedMonth = document.getElementById("diz-filter-month").value;
+    const selectedStatus = document.getElementById("diz-filter-status").value;
+    const searchVal = (document.getElementById("diz-filter-search").value || "").toLowerCase().trim();
+
+    /* Filtra membros dizimistas cadastrados */
+    let dizimistas = globalStudentsCache.filter((s) => {
+        const isDiz = s.financial === "Dízimo" || !s.financial; /* Considera dízimo por padrão */
+        const matchName = (s.name || "").toLowerCase().includes(searchVal);
+        return isDiz && matchName;
+    });
+
+    /* Mapeamento de lançamentos de dízimos do ano selecionado */
+    /* Considera lançamentos do tipo "Entrada" onde a categoria contenha "Dízimo" */
+    const dizimoTxs = globalFinanceCache.filter((t) => {
+        if (!t.date || t.type !== "Entrada") return false;
+        const cat = (t.category || "").toLowerCase();
+        if (!cat.includes("dízimo") && !cat.includes("dizimo")) return false;
+        const dt = parseLocalDate(t.date);
+        return dt.getFullYear() === selectedYear;
+    });
+
+    const monthNames = ["JAN", "FEV", "MAR", "ABR", "MAI", "JUN", "JUL", "AGO", "SET", "OUT", "NOV", "DEZ"];
+    const tableHeaderTr = document.getElementById("diz-table-header");
+
+    /* Ajusta o cabeçalho se um mês específico for selecionado */
+    if (selectedMonth !== "all") {
+        const mIdx = Number(selectedMonth);
+        tableHeaderTr.innerHTML = `
+        <th class="text-start">NOME DO DIZIMISTA</th>
+        <th>MINISTÉRIO / DEP.</th>
+        <th>CONTRIBUIU EM ${monthNames[mIdx]}?</th>
+        <th>VALOR ($)</th>
+        <th>FORMA</th>
+        <th>DATA LANÇAMENTO</th>
+      `;
+    } else {
+        tableHeaderTr.innerHTML = `
+        <th class="text-start">NOME DO DIZIMISTA</th>
+        <th>JAN</th><th>FEV</th><th>MAR</th><th>ABR</th><th>MAI</th><th>JUN</th>
+        <th>JUL</th><th>AGO</th><th>SET</th><th>OUT</th><th>NOV</th><th>DEZ</th>
+        <th>TOTAL (R$)</th>
+      `;
+    }
+
+    const tbody = document.querySelector("#table-dizimistas tbody");
+    tbody.innerHTML = "";
+
+    let totalPaidInPeriodCount = 0;
+    let totalUnpaidInPeriodCount = 0;
+    let totalDizimoAmountInPeriod = 0;
+
+    const rowsToRender = [];
+
+    dizimistas.forEach((diz) => {
+        // Mapeia dízimos deste membro pelos 12 meses
+        const monthsData = Array(12)
+            .fill(null)
+            .map(() => ({ paid: false, amount: 0, methods: [], dates: [] }));
+
+        dizimoTxs.forEach((tx) => {
+            if ((tx.student || "").trim().toLowerCase() === (diz.name || "").trim().toLowerCase()) {
+                const m = parseLocalDate(tx.date).getMonth();
+                monthsData[m].paid = true;
+                monthsData[m].amount += Number(tx.amount || 0);
+                if (tx.method) monthsData[m].methods.push(tx.method);
+                if (tx.date) monthsData[m].dates.push(tx.date);
+            }
+        });
+
+        let dizTotalYear = monthsData.reduce((acc, curr) => acc + curr.amount, 0);
+
+        /* Lógica de filtro por status */
+        let hasContribution = false;
+        if (selectedMonth === "all") {
+            hasContribution = monthsData.some((m) => m.paid);
+        } else {
+            hasContribution = monthsData[Number(selectedMonth)].paid;
+        }
+
+        if (selectedStatus === "paid" && !hasContribution) return;
+        if (selectedStatus === "unpaid" && hasContribution) return;
+
+        if (hasContribution) totalPaidInPeriodCount++;
+        else totalUnpaidInPeriodCount++;
+
+        if (selectedMonth === "all") {
+            totalDizimoAmountInPeriod += dizTotalYear;
+        } else {
+            totalDizimoAmountInPeriod += monthsData[Number(selectedMonth)].amount;
+        }
+
+        rowsToRender.push({ diz, monthsData, dizTotalYear, hasContribution });
+    });
+
+    if (rowsToRender.length === 0) {
+        const colCount = selectedMonth === "all" ? 14 : 6;
+        tbody.innerHTML = `<tr><td colspan="${colCount}" class="text-center text-muted py-4">Nenhum registro de dizimista encontrado com os filtros selecionados.</td></tr>`;
+    } else {
+        rowsToRender.sort((a, b) => (a.diz.name || "").localeCompare(b.diz.name || ""));
+
+        rowsToRender.forEach(({ diz, monthsData, dizTotalYear }) => {
+            let rowHtml = "";
+
+            if (selectedMonth === "all") {
+                let colsHtml = "";
+                monthsData.forEach((m) => {
+                    if (m.paid) {
+                        colsHtml += `<td class="table-success text-success fw-bold" title="${fmtCurr(m.amount)} (${m.methods.join(", ")})">
+                <i class="bi bi-check-circle-fill"></i>
+              </td>`;
+                    } else {
+                        colsHtml += `<td class="table-light text-muted opacity-50"><i class="bi bi-x-lg"></i></td>`;
+                    }
+                });
+
+                rowHtml = `<tr>
+            <td class="text-start fw-semibold">${diz.name}</td>
+            ${colsHtml}
+            <td class="fw-bold ${dizTotalYear > 0 ? "text-success" : "text-muted"}">${fmtCurr(dizTotalYear)}</td>
+          </tr>`;
+            } else {
+                const mIdx = Number(selectedMonth);
+                const mData = monthsData[mIdx];
+                const dt = mData.dates[0] ? parseLocalDate(mData.dates[0]) : null;
+                const formattedDt = dt
+                    ? `${String(dt.getDate()).padStart(2, "0")}/${String(dt.getMonth() + 1).padStart(2, "0")}/${dt.getFullYear()}`
+                    : "-";
+
+                rowHtml = `<tr>
+            <td class="text-start fw-semibold">${diz.name}</td>
+            <td>${diz.class || "Geral"}</td>
+            <td>
+              <span class="badge ${mData.paid ? "bg-success" : "bg-danger"}">
+                ${mData.paid ? "SIM" : "NÃO"}
+              </span>
+            </td>
+            <td class="fw-bold ${mData.paid ? "text-success" : ""}">${fmtCurr(mData.amount)}</td>
+            <td>${mData.methods.join(", ") || "-"}</td>
+            <td>${formattedDt}</td>
+          </tr>`;
+            }
+
+            tbody.innerHTML += rowHtml;
+        });
+    }
+
+    /* Atualiza cards estatísticos do gabarito */
+    document.getElementById("diz-stat-total").textContent = dizimistas.length;
+    document.getElementById("diz-stat-paid").textContent = totalPaidInPeriodCount;
+    document.getElementById("diz-stat-unpaid").textContent = totalUnpaidInPeriodCount;
+    document.getElementById("diz-stat-amount").textContent = fmtCurr(totalDizimoAmountInPeriod);
+}
+
+/* Eventos dos filtros do gabarito de dizimistas */
+document.getElementById("diz-filter-year").addEventListener("change", renderDizimistasGabarito);
+document.getElementById("diz-filter-month").addEventListener("change", renderDizimistasGabarito);
+document.getElementById("diz-filter-status").addEventListener("change", renderDizimistasGabarito);
+document.getElementById("diz-filter-search").addEventListener("input", renderDizimistasGabarito);
+
+/* Rendereizar dashboard */
 function renderDashboard(students, finance) {
     const activeStudents = students.filter((s) => s.status === "Ativo");
     document.getElementById("dash-active-students").textContent = activeStudents.length;
@@ -295,10 +459,11 @@ function renderDashboard(students, finance) {
                     label: "Saldo Mensal (R$)",
                     data: saldosMensais,
                     backgroundColor: saldosMensais.map((v) =>
-                        v >= 0 ? "rgba(35, 130, 83, 0.7)" : "rgba(168, 59, 50, 0.7)"
+                        v >= 0 ? "rgba(16, 185, 129, 0.75)" : "rgba(239, 68, 68, 0.75)"
                     ),
-                    borderColor: saldosMensais.map((v) => (v >= 0 ? "rgb(35, 130, 83)" : "rgb(168, 59, 50)")),
+                    borderColor: saldosMensais.map((v) => (v >= 0 ? "rgb(16, 185, 129)" : "rgb(239, 68, 68)")),
                     borderWidth: 1,
+                    borderRadius: 6,
                 },
             ],
         };
@@ -316,7 +481,12 @@ function renderDashboard(students, finance) {
                     maintainAspectRatio: false,
                     plugins: {
                         legend: { display: false },
-                        title: { display: true, text: `Saldo Mensal - Ano ${ano}`, color: "#666", font: { size: 14 } },
+                        title: {
+                            display: true,
+                            text: `Saldo Mensal - Ano ${ano}`,
+                            color: "#64748b",
+                            font: { size: 14, weight: "600" },
+                        },
                         tooltip: {
                             callbacks: {
                                 label: (context) => `Saldo: ${fmtCurr(context.parsed.y)}`,
@@ -326,6 +496,7 @@ function renderDashboard(students, finance) {
                     scales: {
                         y: {
                             beginAtZero: true,
+                            grid: { color: "#f1f5f9" },
                             ticks: {
                                 callback: (value) =>
                                     value.toLocaleString("pt-BR", {
@@ -335,6 +506,9 @@ function renderDashboard(students, finance) {
                                         maximumFractionDigits: 0,
                                     }),
                             },
+                        },
+                        x: {
+                            grid: { display: false },
                         },
                     },
                 },
@@ -361,7 +535,7 @@ function renderDashboard(students, finance) {
     const labelsTurmas = Object.keys(turmasContagem);
     const dataTurmas = Object.values(turmasContagem);
 
-    const coresTurmas = ["#3E2723", "#5D4037", "#795548", "#B78103", "#D4AF37", "#6d6158", "#a83b32", "#238253"];
+    const coresTurmas = ["#3b82f6", "#10b981", "#f59e0b", "#6366f1", "#8b5cf6", "#ec4899", "#64748b", "#06b6d4"];
 
     const ctxClassElement = document.getElementById("chart-students-class");
 
@@ -409,7 +583,7 @@ function renderDashboard(students, finance) {
     }
 }
 
-/* RENDERIZAR E FILTRAR MEMBROS */
+/* Renderizar e filtrar membros */
 function filterAndRenderStudents() {
     const searchTerm = (document.getElementById("student-search-input").value || "").toLowerCase().trim();
 
@@ -590,7 +764,7 @@ async function deleteStudent(id) {
     }
 }
 
-/* GESTÃO FINANCEIRA */
+/* Gestão financeira */
 async function populateTxStudentSelect(selectedValue = "") {
     const students = await apiGet("Membros");
     const select = document.getElementById("tx-student-link");
@@ -846,7 +1020,7 @@ async function deleteTx(id) {
     }
 }
 
-/* RELATÓRIOS */
+/* Relatórios */
 function renderReports(finance) {
     const tbodyIn = document.querySelector("#table-report-incomes tbody");
     const tbodyOut = document.querySelector("#table-report-expenses tbody");
@@ -928,7 +1102,7 @@ function printReportLandscape() {
     window.print();
 }
 
-/* INICIALIZAÇÃO */
+/* Inicialização */
 if (sessionStorage.getItem("giar_active_user")) {
     document.body.classList.remove("unauthenticated");
     renderApp();
