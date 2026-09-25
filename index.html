@@ -1,0 +1,679 @@
+<!doctype html>
+<html lang="pt-BR">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>GIAR - Gestão Integrada de Atividade Religiosa</title>
+
+        <!-- CDNs Bootstrap 5 & Ícones -->
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet" />
+        <link rel="stylesheet" href="style.css" />
+        <!-- Bibliotecas de Gráficos -->
+        <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    </head>
+    <body class="unauthenticated">
+        <!-- Overlay de Carregamento -->
+        <div id="loading-overlay">
+            <div class="spinner-border text-primary" style="width: 3rem; height: 3rem" role="status">
+                <span class="visually-hidden">Sincronizando com Google Sheets...</span>
+            </div>
+        </div>
+
+        <!-- NAVEGAÇÃO PRINCIPAL -->
+        <nav class="navbar navbar-expand-lg navbar-custom">
+            <div class="container-fluid">
+                <a class="navbar-brand d-flex align-items-center gap-2" href="#">
+                    <span class="brand-mark"><i class="bi bi-journal-bookmark-fill text-white fs-3"></i></span>
+                    <span style="font-weight: 700; color: var(--nav-text); font-size: 1.05rem"
+                        >GIAR - AD Cetro de Justiça</span
+                    >
+                </a>
+
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navmenu">
+                    <span class="navbar-toggler-icon" style="filter: invert(1)"></span>
+                </button>
+
+                <div class="collapse navbar-collapse" id="navmenu">
+                    <ul class="navbar-nav me-auto mb-2 mb-lg-0" id="main-nav" role="tablist">
+                        <li class="nav-item">
+                            <a class="nav-link active" data-bs-toggle="tab" data-bs-target="#dashboard" role="tab"
+                                ><i class="bi bi-speedometer2"></i> Dashboard</a
+                            >
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" data-bs-toggle="tab" data-bs-target="#students" role="tab"
+                                ><i class="bi bi-person-vcard-fill"></i> Gestão de Membros</a
+                            >
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" data-bs-toggle="tab" data-bs-target="#finance" role="tab"
+                                ><i class="bi bi-cash-coin"></i> Finanças & Caixa</a
+                            >
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" data-bs-toggle="tab" data-bs-target="#reports" role="tab"
+                                ><i class="bi bi-file-earmark-bar-graph-fill"></i> Relatórios</a
+                            >
+                        </li>
+                    </ul>
+
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="text-white small-muted d-none d-xl-block">
+                            <i class="bi bi-envelope-fill"></i> giar@gmail.com
+                        </div>
+                        <div id="user-area" class="text-white fw-semibold">
+                            <i class="bi bi-person-circle"></i> <span id="user-name">Usuário</span>
+                        </div>
+                        <button class="btn btn-outline-light btn-sm" id="btn-logout" title="Sair">
+                            <i class="bi bi-box-arrow-right"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- CONTEÚDO PRINCIPAL -->
+        <div class="container py-4">
+            <div class="tab-content">
+                <!-- DASHBOARD -->
+                <div class="tab-pane fade show active" id="dashboard" role="tabpanel">
+                    <div class="row g-3">
+                        <div class="col-lg-8">
+                            <div class="card-clean mb-3">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <h5 class="mb-0">
+                                        <i class="bi bi-bar-chart-line-fill me-2 text-primary"></i>Visão Geral das
+                                        Arrecadações
+                                    </h5>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <label for="dash-year-filter" class="small-muted mb-0">Ano:</label>
+                                        <select
+                                            id="dash-year-filter"
+                                            class="form-select form-select-sm"
+                                            style="width: auto"
+                                        ></select>
+                                    </div>
+                                </div>
+                                <div class="row g-2">
+                                    <div class="col-md-4">
+                                        <div
+                                            class="summary-card"
+                                            style="background: linear-gradient(90deg, #ff7ab6, #e91e63)"
+                                        >
+                                            <div class="small-muted text-white-50">Entradas (Recursos)</div>
+                                            <div class="summary-value" id="dash-total-income">R$ 0,00</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div
+                                            class="summary-card"
+                                            style="background: linear-gradient(90deg, #4bc0ff, #00aaff)"
+                                        >
+                                            <div class="small-muted text-white-50">Saídas (Despesas)</div>
+                                            <div class="summary-value" id="dash-total-expense">R$ 0,00</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div
+                                            class="summary-card"
+                                            style="background: linear-gradient(90deg, #2ecc71, #1aa05a)"
+                                        >
+                                            <div class="small-muted text-white-50">Saldo Líquido</div>
+                                            <div class="summary-value" id="dash-balance">R$ 0,00</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- GRÁFICO -->
+                                <div class="row mt-4">
+                                    <div class="col-12" style="height: 250px">
+                                        <canvas id="chart-finance-monthly"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- CARD DO GRÁFICO DE MINISTÉRIOS -->
+                            <div class="card-clean mb-5 p-3">
+                                <h6 class="mb-3 text-primary">
+                                    <i class="bi bi-pie-chart-fill me-2"></i>Membros Ativos por Ministério /
+                                    Departamento
+                                </h6>
+                                <div style="height: 220px; position: relative">
+                                    <canvas id="chart-students-class"></canvas>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-lg-4">
+                            <div
+                                class="card-clean mb-3 p-3 text-center"
+                                style="background: var(--primary-color); color: #fff !important"
+                            >
+                                <h6 class="small-muted text-white-50">Total de Membros Ativos</h6>
+                                <div class="display-6 fw-bold" id="dash-active-students">0</div>
+                            </div>
+
+                            <!-- CARD: FAIXA ETÁRIA -->
+                            <div class="card-clean mb-3 p-3">
+                                <h6 class="mb-3 text-primary">
+                                    <i class="bi bi-diagram-3-fill me-2"></i>Distribuição por Faixa Etária
+                                </h6>
+                                <div class="d-flex justify-content-around text-center small">
+                                    <div>
+                                        <div class="h3 fw-bold text-success" id="age-children">0</div>
+                                        <div class="text-muted">Crianças<br />(0-12)</div>
+                                    </div>
+                                    <div>
+                                        <div class="h3 fw-bold text-warning" id="age-teens">0</div>
+                                        <div class="text-muted">Adolescentes<br />(13-17)</div>
+                                    </div>
+                                    <div>
+                                        <div class="h3 fw-bold text-primary" id="age-adults">0</div>
+                                        <div class="text-muted">Adultos<br />(18+)</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="card-clean mb-3 p-3">
+                                <h6 class="mb-3 text-primary">
+                                    <i class="bi bi-cake2-fill me-2"></i>Aniversariantes do Mês
+                                </h6>
+                                <ul class="list-group list-group-flush small" id="dash-birthdays-list">
+                                    <li class="list-group-item text-muted">Carregando dados...</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- GESTÃO DE MEMBROS -->
+                <div class="tab-pane fade" id="students" role="tabpanel">
+                    <div class="card-clean mb-3">
+                        <div
+                            class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-3"
+                        >
+                            <h5 class="mb-0">
+                                <i class="bi bi-person-vcard-fill me-2 text-primary"></i>Cadastro de Membros
+                            </h5>
+
+                            <div class="d-flex flex-grow-1 flex-md-grow-0 gap-2" style="max-width: 450px">
+                                <div class="input-group">
+                                    <span class="input-group-text bg-light border-end-0"
+                                        ><i class="bi bi-search text-muted"></i
+                                    ></span>
+                                    <input
+                                        type="text"
+                                        id="student-search-input"
+                                        class="form-control border-start-0"
+                                        placeholder="Filtrar membro pelo nome..."
+                                    />
+                                </div>
+                                <button class="btn btn-pink text-nowrap" id="btn-new-student">
+                                    <i class="bi bi-person-plus-fill me-1"></i>Novo Membro
+                                </button>
+                            </div>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle" id="table-students">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Nome Completo</th>
+                                        <th>Status</th>
+                                        <th>Contribuição</th>
+                                        <th>Cidade/UF</th>
+                                        <th class="text-end">Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- FINANÇAS -->
+                <div class="tab-pane fade" id="finance" role="tabpanel">
+                    <div class="card-clean mb-3 p-3">
+                        <div
+                            class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-3"
+                        >
+                            <h5 class="mb-0">
+                                <i class="bi bi-cash-stack me-2 text-primary"></i>Lançamentos Financeiros
+                            </h5>
+                            <button class="btn btn-pink" id="btn-new-transaction">
+                                <i class="bi bi-plus-lg me-1"></i>Novo Lançamento
+                            </button>
+                        </div>
+
+                        <div class="row g-3 mb-3">
+                            <div class="col-12 col-md-4">
+                                <div class="card border-0 shadow-sm bg-success-subtle text-success p-3 rounded-3">
+                                    <div class="d-flex align-items-center justify-content-between">
+                                        <div>
+                                            <small class="text-uppercase fw-bold opacity-75">Total Entradas</small>
+                                            <h4 class="mb-0 fw-bold" id="fin-sum-income">R$ 0,00</h4>
+                                        </div>
+                                        <div class="fs-1 opacity-50">
+                                            <i class="bi bi-arrow-up-circle-fill"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-12 col-md-4">
+                                <div class="card border-0 shadow-sm bg-danger-subtle text-danger p-3 rounded-3">
+                                    <div class="d-flex align-items-center justify-content-between">
+                                        <div>
+                                            <small class="text-uppercase fw-bold opacity-75">Total Saídas</small>
+                                            <h4 class="mb-0 fw-bold" id="fin-sum-expense">R$ 0,00</h4>
+                                        </div>
+                                        <div class="fs-1 opacity-50">
+                                            <i class="bi bi-arrow-down-circle-fill"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-12 col-md-4">
+                                <div class="card border-0 shadow-sm p-3 rounded-3" id="card-fin-balance-bg">
+                                    <div class="d-flex align-items-center justify-content-between">
+                                        <div>
+                                            <small class="text-uppercase fw-bold opacity-75">Saldo do Período</small>
+                                            <h4 class="mb-0 fw-bold" id="fin-sum-balance">R$ 0,00</h4>
+                                        </div>
+                                        <div class="fs-1 opacity-50">
+                                            <i class="bi bi-wallet2"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row g-2 mb-3 bg-light p-2 rounded align-items-end">
+                            <div class="col-6 col-md-3">
+                                <label for="fin-filter-month" class="form-label small mb-1">Mês:</label>
+                                <select id="fin-filter-month" class="form-select form-select-sm">
+                                    <option value="">Todos os Meses</option>
+                                    <option value="0">Janeiro</option>
+                                    <option value="1">Fevereiro</option>
+                                    <option value="2">Março</option>
+                                    <option value="3">Abril</option>
+                                    <option value="4">Maio</option>
+                                    <option value="5">Junho</option>
+                                    <option value="6">Julho</option>
+                                    <option value="7">Agosto</option>
+                                    <option value="8">Setembro</option>
+                                    <option value="9">Outubro</option>
+                                    <option value="10">Novembro</option>
+                                    <option value="11">Dezembro</option>
+                                </select>
+                            </div>
+
+                            <div class="col-6 col-md-2">
+                                <label for="fin-filter-year" class="form-label small mb-1">Ano:</label>
+                                <select id="fin-filter-year" class="form-select form-select-sm">
+                                    <option value="">Todos</option>
+                                    <option value="2024">2024</option>
+                                    <option value="2025">2025</option>
+                                    <option value="2026">2026</option>
+                                    <option value="2027">2027</option>
+                                </select>
+                            </div>
+
+                            <div class="col-6 col-md-3">
+                                <label for="fin-filter-date" class="form-label small mb-1">Dia Exato:</label>
+                                <input type="date" id="fin-filter-date" class="form-control form-control-sm" />
+                            </div>
+
+                            <div class="col-6 col-md-4">
+                                <button
+                                    id="btn-clear-fin-filters"
+                                    class="btn btn-outline-secondary btn-sm w-100"
+                                    style="height: 40px"
+                                >
+                                    <i class="bi bi-x-circle me-1"></i>Limpar Filtros
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="table-responsive">
+                            <table class="table table-striped table-fin mb-0" id="table-finance">
+                                <thead>
+                                    <tr>
+                                        <th>CÓD</th>
+                                        <th>DATA</th>
+                                        <th>TIPO</th>
+                                        <th>MODALIDADE / CATEGORIA</th>
+                                        <th>VÍNCULO / MEMBRO</th>
+                                        <th>FORMA</th>
+                                        <th>ENTRADA ($)</th>
+                                        <th>SAÍDA ($)</th>
+                                        <th class="text-end">AÇÕES</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- RELATÓRIOS -->
+                <div class="tab-pane fade" id="reports" role="tabpanel">
+                    <div class="card-clean mb-3 p-3" id="section-balancete-report">
+                        <div
+                            class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-2 mb-3"
+                        >
+                            <h5 class="mb-0">
+                                <i class="bi bi-file-earmark-bar-graph me-2 text-primary"></i>Balancete Resumido
+                                Financeiro
+                            </h5>
+
+                            <button class="btn btn-outline-primary btn-sm" onclick="printReportLandscape()">
+                                <i class="bi bi-printer me-1"></i>Imprimir em Paisagem
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="row g-3">
+                        <div class="col-12 col-md-6">
+                            <div class="card border-0 shadow-sm p-3 h-100">
+                                <h6 class="text-success fw-bold border-bottom pb-2 mb-3">
+                                    <i class="bi bi-arrow-up-circle-fill me-2"></i>Entradas por Categoria
+                                </h6>
+                                <div class="table-responsive">
+                                    <table
+                                        class="table table-sm table-hover align-middle mb-0"
+                                        id="table-report-incomes"
+                                    >
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>TIPO / CATEGORIA</th>
+                                                <th class="text-end">QTD</th>
+                                                <th class="text-end">VALOR TOTAL</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody></tbody>
+                                        <tfoot>
+                                            <tr class="fw-bold table-success">
+                                                <td>TOTAL ENTRADAS</td>
+                                                <td class="text-end" id="rep-total-in-count">0</td>
+                                                <td class="text-end" id="rep-total-in-amount">R$ 0,00</td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <div class="card border-0 shadow-sm p-3 h-100">
+                                <h6 class="text-danger fw-bold border-bottom pb-2 mb-3">
+                                    <i class="bi bi-arrow-down-circle-fill me-2"></i>Saídas por Categoria
+                                </h6>
+                                <div class="table-responsive">
+                                    <table
+                                        class="table table-sm table-hover align-middle mb-0"
+                                        id="table-report-expenses"
+                                    >
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>TIPO / CATEGORIA</th>
+                                                <th class="text-end">QTD</th>
+                                                <th class="text-end">VALOR TOTAL</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody></tbody>
+                                        <tfoot>
+                                            <tr class="fw-bold table-danger">
+                                                <td>TOTAL SAÍDAS</td>
+                                                <td class="text-end" id="rep-total-out-count">0</td>
+                                                <td class="text-end" id="rep-total-out-amount">R$ 0,00</td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAIS -->
+
+        <!-- Modal Login -->
+        <div class="modal fade" id="modalLogin" tabindex="-1" data-bs-backdrop="static">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <form id="form-login">
+                        <div class="modal-header bg-primary text-white text-center d-block">
+                            <h5 class="modal-title">AD Cetro de Justiça</h5>
+                            <small class="text-white-50">GIAR - Gestão Integrada de Atividade Religiosa</small>
+                        </div>
+                        <div class="modal-body p-4">
+                            <div class="mb-3">
+                                <label class="form-label">E-mail Institucional</label>
+                                <input
+                                    type="email"
+                                    class="form-control"
+                                    id="login-email"
+                                    value="giar@gmail.com"
+                                    required
+                                />
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Senha</label>
+                                <input
+                                    type="password"
+                                    class="form-control"
+                                    id="login-password"
+                                    value="123456"
+                                    required
+                                />
+                            </div>
+
+                            <div
+                                id="login-alert"
+                                class="alert alert-danger alert-dismissible fade show d-none mb-0"
+                                role="alert"
+                            >
+                                <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                                <strong>Erro:</strong> Usuário ou senha inválidos!
+                                <button
+                                    type="button"
+                                    class="btn-close"
+                                    onclick="document.getElementById('login-alert').classList.add('d-none')"
+                                ></button>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="submit" class="btn btn-pink w-100">Acessar Sistema</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal Membro -->
+        <div class="modal fade" id="modalStudent" tabindex="-1">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <form id="form-student">
+                        <input type="hidden" id="student-id" />
+                        <div class="modal-header">
+                            <h5 class="modal-title">Cadastrar Membro</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="row g-2">
+                                <div class="col-md-4">
+                                    <label class="form-label">Status</label>
+                                    <select id="student-status" class="form-select">
+                                        <option value="Ativo">Ativo</option>
+                                        <option value="Inativo">Inativo</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-8">
+                                    <label class="form-label">Nome Completo</label>
+                                    <input id="student-name" class="form-control" required="" />
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Data de Nascimento</label>
+                                    <input id="student-dob" type="date" class="form-control" required="" />
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">RG</label>
+                                    <input id="student-rg" class="form-control" />
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Contribuição</label>
+                                    <select id="student-financial" class="form-select">
+                                        <option value="Dízimo">Dízimo</option>
+                                        <option value="Oferta">Oferta</option>
+                                    </select>
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label class="form-label">Nome da Mãe</label>
+                                    <input
+                                        id="student-mother"
+                                        class="form-control"
+                                        placeholder="Nome completo da mãe"
+                                    />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Nome do Pai</label>
+                                    <input
+                                        id="student-father"
+                                        class="form-control"
+                                        placeholder="Nome completo do pai"
+                                    />
+                                </div>
+                                <div class="col-md-12">
+                                    <label class="form-label">Ministério / Departamento</label>
+                                    <select id="student-class" class="form-select">
+                                        <option value="">Selecione um ministério...</option>
+                                        <option value="Crianças">Crianças</option>
+                                        <option value="Jovens">Jovens</option>
+                                        <option value="Adolescentes">Adolescentes</option>
+                                        <option value="Varões">Varões</option>
+                                        <option value="Senhoras">Senhoras</option>
+                                        <option value="Banda">Banda</option>
+                                    </select>
+                                </div>
+
+                                <div class="col-md-3">
+                                    <label class="form-label">CEP</label>
+                                    <input id="student-cep" class="form-control" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Logradouro</label>
+                                    <input id="student-street" class="form-control" />
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Número</label>
+                                    <input id="student-number" class="form-control" />
+                                </div>
+                                <div class="col-md-5">
+                                    <label class="form-label">Bairro</label>
+                                    <input id="student-neighborhood" class="form-control" />
+                                </div>
+                                <div class="col-md-5">
+                                    <label class="form-label">Cidade</label>
+                                    <input id="student-city" class="form-control" />
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label">UF</label>
+                                    <input id="student-uf" class="form-control" />
+                                </div>
+
+                                <div class="col-md-12">
+                                    <label class="form-label">Observações Adicionais</label>
+                                    <textarea
+                                        id="student-notes"
+                                        class="form-control"
+                                        rows="3"
+                                        placeholder="Adicione dizertes ou informações relevantes..."
+                                    ></textarea>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="submit" class="btn btn-pink">Salvar</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal Transação -->
+        <div class="modal fade" id="modalTransaction" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <form id="form-transaction">
+                        <input type="hidden" id="tx-id" />
+                        <div class="modal-header">
+                            <h5 class="modal-title">Lançamento Financeiro</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="row g-2">
+                                <div class="col-md-6">
+                                    <label class="form-label">Data</label>
+                                    <input id="tx-date" type="date" class="form-control" required />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Tipo</label>
+                                    <select id="tx-type" class="form-select">
+                                        <option value="Entrada">Entrada</option>
+                                        <option value="Saída">Saída</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Modalidade / Categoria</label>
+                                    <input
+                                        id="tx-category"
+                                        class="form-control"
+                                        placeholder="Ex: Dízimo, Oferta, Manutenção"
+                                        required
+                                    />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Vínculo / Membro</label>
+                                    <select id="tx-student-link" class="form-select">
+                                        <option value="">Sem Vínculo</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Forma de Recebimento</label>
+                                    <select id="tx-method" class="form-select">
+                                        <option value="Cartão de Crédito">Cartão de Crédito</option>
+                                        <option value="Débito">Débito</option>
+                                        <option value="Dinheiro">Dinheiro</option>
+                                        <option value="Pix">Pix</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Valor ($)</label>
+                                    <input id="tx-amount" type="number" step="0.01" class="form-control" required />
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="submit" class="btn btn-pink">Salvar</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <footer class="footer-fixed">
+            <div class="container-fluid text-center">
+                GIAR &copy; Igreja Assembléia de Deus Cetro de Justiça - E-mail: giar@gmail.com
+            </div>
+        </footer>
+
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+        <script src="./script.js" defer></script>
+    </body>
+</html>
