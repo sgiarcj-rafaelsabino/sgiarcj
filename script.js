@@ -1,6 +1,6 @@
 /* CONFIGURAÇÃO DA API DO GOOGLE APPS SCRIPT API GIAR V1 */
 const API_URL =
-    "https://script.google.com/macros/s/AKfycbxcwlNRWrCHUq-emMn0GJdne6hR0UvHnmVYR039RmItJuYcCITTxdn9HlAXPVIjABYE/exec";
+    "https://script.google.com/macros/s/AKfycbz4PAEie6v1FQvqgKKCy2FfwgTYrn-vEQyE-WEL-xOMpXicCHO4YZ3cflpPHgvBlxmt/exec";
 
 const uid = () => Date.now().toString(36) + Math.random().toString(36).substring(2);
 const fmtCurr = (v) => (Number(v) || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
