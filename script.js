@@ -102,15 +102,14 @@ async function apiPost(sheetName, actionType, payload) {
       bodyObj.id = payload;
     }
 
-    // Modo no-cors e text/plain evita bloqueios do Google Apps Script
     await fetch(API_URL, {
       method: 'POST',
-      mode: 'no-cors',
+      mode: 'no-cors', // Evita bloqueio de CORS com o Apps Script
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify(bodyObj)
     });
 
-    // Tempo de espera para o Google Apps Script gravar a alteração na planilha
+    // Aguarda 1.5 segundos para garantir o processamento na planilha
     await new Promise(r => setTimeout(r, 1500));
     return { success: true };
   } catch (err) {
