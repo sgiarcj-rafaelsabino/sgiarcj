@@ -18,28 +18,27 @@ let classChart = null;
 let globalStudentsCache = [];
 
 async function apiGet(sheetName) {
-  try {
-    const url = `${API_URL}?action=read&sheet=${encodeURIComponent(sheetName)}`;
-    
-    const res = await fetch(url, {
-      method: 'GET',
-      mode: 'cors',
-      redirect: 'follow',
-      headers: {
-        'Accept': 'application/json'
-      }
-    });
+    showLoading(true);
+    try {
+        const url = `${API_URL}?action=read&sheet=${encodeURIComponent(sheetName)}`;
+        const res = await fetch(url, {
+            method: "GET",
+            mode: "cors",
+            redirect: "follow",
+        });
 
-    if (!res.ok) {
-      throw new Error(`Erro na requisição HTTP: ${res.status}`);
+        if (!res.ok) {
+            throw new Error(`Erro na requisição: ${res.statusText}`);
+        }
+
+        const data = await res.json();
+        return Array.isArray(data) ? data : [];
+    } catch (err) {
+        console.error("Erro na leitura:", err);
+        return [];
+    } finally {
+        showLoading(false);
     }
-
-    const data = await res.json();
-    return Array.isArray(data) ? data : [];
-  } catch (err) {
-    console.error("Erro na leitura:", err);
-    throw err;
-  }
 }
 
 async function apiPost(sheetName, actionType, payload) {
