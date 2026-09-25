@@ -15,15 +15,15 @@ const modalLogin = new bootstrap.Modal(document.getElementById("modalLogin"));
 const modalStudent = new bootstrap.Modal(document.getElementById("modalStudent"));
 const modalTx = new bootstrap.Modal(document.getElementById("modalTransaction"));
 
-/* Variáveis globais para os gráficos */
+// Variáveis globais para os gráficos
 let financeChart = null;
 let classChart = null;
 
-/* Variável global para cache da lista de alunos */
+// Variável global para cache da lista de alunos
 let globalStudentsCache = [];
 let globalFinanceCache = [];
 
-/* Funções auxiliares de data */
+/* Funções auxiliares de datas */
 function parseLocalDate(dateStr) {
     if (!dateStr) return new Date();
 
@@ -104,12 +104,12 @@ async function apiPost(sheetName, actionType, payload) {
 
         await fetch(API_URL, {
             method: "POST",
-            mode: "no-cors" /* Evita bloqueio de CORS com o Apps Script */,
+            mode: "no-cors", // Evita bloqueio de CORS com o Apps Script
             headers: { "Content-Type": "text/plain;charset=utf-8" },
             body: JSON.stringify(bodyObj),
         });
 
-        /* Aguarda 1.5 segundos para garantir o processamento na planilha */
+        // Aguarda 1.5 segundos para garantir o processamento na planilha
         await new Promise((r) => setTimeout(r, 1500));
         return { success: true };
     } catch (err) {
@@ -153,7 +153,34 @@ document.getElementById("btn-logout").addEventListener("click", () => {
     modalLogin.show();
 });
 
-/* Busca Cep */
+/* Controle de permissões (RBAC) */
+function applyUserPermissions(user) {
+    const role = (user.role || "").toLowerCase().trim();
+    const isSecretary = role === "secretária" || role === "secretaria" || role === "secretario";
+
+    // Oculta/Exibe os itens da navegação conforme o perfil
+    const finNavItems = document.querySelectorAll(".nav-role-financeiro");
+    finNavItems.forEach((el) => {
+        el.style.display = isSecretary ? "none" : "";
+    });
+
+    // Garante redirecionamento para o Dashboard caso o usuário seja secretária e tente acessar abas restritas
+    if (isSecretary) {
+        const activeTab = document.querySelector("#main-nav .nav-link.active");
+        if (activeTab) {
+            const target = activeTab.getAttribute("data-bs-target");
+            if (target === "#dizimistas" || target === "#finance" || target === "#reports") {
+                const dashTab = document.querySelector('#main-nav a[data-bs-target="#dashboard"]');
+                if (dashTab) {
+                    const tabTrigger = new bootstrap.Tab(dashTab);
+                    tabTrigger.show();
+                }
+            }
+        }
+    }
+}
+
+/* Busca de Cep */
 document.getElementById("student-cep").addEventListener("blur", async (e) => {
     const cep = e.target.value.replace(/\D/g, "");
     if (cep.length === 8) {
@@ -172,11 +199,14 @@ document.getElementById("student-cep").addEventListener("blur", async (e) => {
     }
 });
 
-/* Rendereização principal */
+/* Renderização principal */
 async function renderApp() {
     const user = JSON.parse(sessionStorage.getItem("giar_active_user"));
     if (!user) return;
     document.getElementById("user-name").textContent = user.name;
+
+    // Aplica o filtro de permissões baseado na role do usuário
+    applyUserPermissions(user);
 
     try {
         const [students, finance] = await Promise.all([apiGet("Membros"), apiGet("Financas")]);
@@ -195,22 +225,21 @@ async function renderApp() {
     }
 }
 
-/* Rendereizar gabarito de dizimistas */
+/* Renderizar gabarito de dizimistas */
 function renderDizimistasGabarito() {
     const selectedYear = Number(document.getElementById("diz-filter-year").value);
     const selectedMonth = document.getElementById("diz-filter-month").value;
     const selectedStatus = document.getElementById("diz-filter-status").value;
     const searchVal = (document.getElementById("diz-filter-search").value || "").toLowerCase().trim();
 
-    /* Filtra membros dizimistas cadastrados */
+    // Filtra membros dizimistas cadastrados
     let dizimistas = globalStudentsCache.filter((s) => {
-        const isDiz = s.financial === "Dízimo" || !s.financial; /* Considera dízimo por padrão */
+        const isDiz = s.financial === "Dízimo" || !s.financial; // Considera dízimo por padrão
         const matchName = (s.name || "").toLowerCase().includes(searchVal);
         return isDiz && matchName;
     });
 
-    /* Mapeamento de lançamentos de dízimos do ano selecionado */
-    /* Considera lançamentos do tipo "Entrada" onde a categoria contenha "Dízimo" */
+    // Mapeamento de lançamentos de dízimos do ano selecionado
     const dizimoTxs = globalFinanceCache.filter((t) => {
         if (!t.date || t.type !== "Entrada") return false;
         const cat = (t.category || "").toLowerCase();
@@ -222,7 +251,7 @@ function renderDizimistasGabarito() {
     const monthNames = ["JAN", "FEV", "MAR", "ABR", "MAI", "JUN", "JUL", "AGO", "SET", "OUT", "NOV", "DEZ"];
     const tableHeaderTr = document.getElementById("diz-table-header");
 
-    /* Ajusta o cabeçalho se um mês específico for selecionado */
+    // Ajusta o cabeçalho se um mês específico for selecionado
     if (selectedMonth !== "all") {
         const mIdx = Number(selectedMonth);
         tableHeaderTr.innerHTML = `
@@ -269,7 +298,7 @@ function renderDizimistasGabarito() {
 
         let dizTotalYear = monthsData.reduce((acc, curr) => acc + curr.amount, 0);
 
-        /* Lógica de filtro por status */
+        // Lógica de filtro por status
         let hasContribution = false;
         if (selectedMonth === "all") {
             hasContribution = monthsData.some((m) => m.paid);
@@ -344,20 +373,20 @@ function renderDizimistasGabarito() {
         });
     }
 
-    /* Atualiza cards estatísticos do gabarito */
+    // Atualiza cards estatísticos do gabarito
     document.getElementById("diz-stat-total").textContent = dizimistas.length;
     document.getElementById("diz-stat-paid").textContent = totalPaidInPeriodCount;
     document.getElementById("diz-stat-unpaid").textContent = totalUnpaidInPeriodCount;
     document.getElementById("diz-stat-amount").textContent = fmtCurr(totalDizimoAmountInPeriod);
 }
 
-/* Eventos dos filtros do gabarito de dizimistas */
+/* Eventos dos filtros do gabarito dos dizimistas */
 document.getElementById("diz-filter-year").addEventListener("change", renderDizimistasGabarito);
 document.getElementById("diz-filter-month").addEventListener("change", renderDizimistasGabarito);
 document.getElementById("diz-filter-status").addEventListener("change", renderDizimistasGabarito);
 document.getElementById("diz-filter-search").addEventListener("input", renderDizimistasGabarito);
 
-/* Rendereizar dashboard */
+/* Renderizar Dashboard */
 function renderDashboard(students, finance) {
     const activeStudents = students.filter((s) => s.status === "Ativo");
     document.getElementById("dash-active-students").textContent = activeStudents.length;
@@ -601,6 +630,10 @@ function renderStudents(students) {
     const tbody = document.querySelector("#table-students tbody");
     tbody.innerHTML = "";
 
+    const user = JSON.parse(sessionStorage.getItem("giar_active_user") || "{}");
+    const role = (user.role || "").toLowerCase().trim();
+    const isSecretary = role === "secretária" || role === "secretaria" || role === "secretario";
+
     if (students.length === 0) {
         tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-4">Nenhum membro encontrado.</td></tr>';
         return;
@@ -609,6 +642,13 @@ function renderStudents(students) {
     students.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
 
     students.forEach((s) => {
+        const deleteButtonHtml = isSecretary
+            ? ""
+            : `
+          <button class="btn btn-outline-danger" onclick="deleteStudent('${s.id}')" title="Excluir Cadastro">
+            <i class="bi bi-trash"></i>
+          </button>`;
+
         tbody.innerHTML += `<tr>
       <td><strong>${s.name || "-"}</strong></td>
       <td><span class="badge ${s.status === "Ativo" ? "bg-success" : "bg-secondary"}">${s.status || "-"}</span></td>
@@ -622,9 +662,7 @@ function renderStudents(students) {
           <button class="btn btn-outline-secondary" onclick="editStudent('${s.id}')" title="Editar Cadastro">
             <i class="bi bi-pencil"></i>
           </button>
-          <button class="btn btn-outline-danger" onclick="deleteStudent('${s.id}')" title="Excluir Cadastro">
-            <i class="bi bi-trash"></i>
-          </button>
+          ${deleteButtonHtml}
         </div>
       </td>
     </tr>`;
