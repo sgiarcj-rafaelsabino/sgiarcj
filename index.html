@@ -3,7 +3,7 @@
     <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>GIAR</title>
+        <title>GIAR - Gestão Integrada de Atividade Religiosa</title>
 
         <!-- CDNs Bootstrap 5 & Ícones -->
         <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
@@ -16,8 +16,9 @@
         <link
             rel="icon"
             type="image/png"
-            href="https://static.wixstatic.com/media/29a27d_bafa4a0a66ad42fabee98faee5287483~mv2.png/v1/fill/w_348,h_356,al_c,q_85,usm_0.66_1.00_0.01,enc_avif,quality_auto/adcjfv.png"
+            href="https://static.wixstatic.com/media/29a27d_8c88271d483b478bad263e6742396128~mv2.png/v1/fill/w_348,h_346,al_c,q_85,usm_0.66_1.00_0.01,enc_avif,quality_auto/adcj.png"
         />
+
         <link rel="stylesheet" href="style.css" />
     </head>
     <body class="unauthenticated">
@@ -44,27 +45,27 @@
 
                 <div class="collapse navbar-collapse" id="navmenu">
                     <ul class="navbar-nav me-auto mb-2 mb-lg-0" id="main-nav" role="tablist">
-                        <li class="nav-item">
+                        <li class="nav-item nav-role-all">
                             <a class="nav-link active" data-bs-toggle="tab" data-bs-target="#dashboard" role="tab"
                                 ><i class="bi bi-speedometer2"></i> Dashboard</a
                             >
                         </li>
-                        <li class="nav-item">
+                        <li class="nav-item nav-role-all">
                             <a class="nav-link" data-bs-toggle="tab" data-bs-target="#students" role="tab"
                                 ><i class="bi bi-person-vcard-fill"></i> Gestão de Membros</a
                             >
                         </li>
-                        <li class="nav-item">
+                        <li class="nav-item nav-role-financeiro">
                             <a class="nav-link" data-bs-toggle="tab" data-bs-target="#dizimistas" role="tab"
                                 ><i class="bi bi-calendar-check-fill"></i> Gabarito de Dizimistas</a
                             >
                         </li>
-                        <li class="nav-item">
+                        <li class="nav-item nav-role-financeiro">
                             <a class="nav-link" data-bs-toggle="tab" data-bs-target="#finance" role="tab"
                                 ><i class="bi bi-cash-coin"></i> Finanças & Caixa</a
                             >
                         </li>
-                        <li class="nav-item">
+                        <li class="nav-item nav-role-financeiro">
                             <a class="nav-link" data-bs-toggle="tab" data-bs-target="#reports" role="tab"
                                 ><i class="bi bi-file-earmark-bar-graph-fill"></i> Relatórios</a
                             >
@@ -500,78 +501,178 @@
 
                 <!-- RELATÓRIOS -->
                 <div class="tab-pane fade" id="reports" role="tabpanel">
-                    <div class="card-clean mb-3 p-3" id="section-balancete-report">
-                        <div
-                            class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-2 mb-3"
-                        >
-                            <h5 class="mb-0">
-                                <i class="bi bi-file-earmark-bar-graph me-2 text-primary"></i>Balancete Resumido
-                                Financeiro
-                            </h5>
-
-                            <button class="btn btn-outline-primary btn-sm" onclick="printReportLandscape()">
-                                <i class="bi bi-printer me-1"></i>Imprimir em Paisagem
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="row g-3">
-                        <div class="col-12 col-md-6">
-                            <div class="card border-0 shadow-sm p-3 h-100">
-                                <h6 class="text-success fw-bold border-bottom pb-2 mb-3">
-                                    <i class="bi bi-arrow-up-circle-fill me-2"></i>Entradas por Categoria
-                                </h6>
-                                <div class="table-responsive">
-                                    <table
-                                        class="table table-sm table-hover align-middle mb-0"
-                                        id="table-report-incomes"
-                                    >
-                                        <thead class="table-light">
-                                            <tr>
-                                                <th>TIPO / CATEGORIA</th>
-                                                <th class="text-end">QTD</th>
-                                                <th class="text-end">VALOR TOTAL</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody></tbody>
-                                        <tfoot>
-                                            <tr class="fw-bold table-success">
-                                                <td>TOTAL ENTRADAS</td>
-                                                <td class="text-end" id="rep-total-in-count">0</td>
-                                                <td class="text-end" id="rep-total-in-amount">R$ 0,00</td>
-                                            </tr>
-                                        </tfoot>
-                                    </table>
+                    <div class="card-clean mb-4 p-4" id="section-balancete-report">
+                        <!-- CABEÇALHO DO RELATÓRIO -->
+                        <div class="balancete-header border-bottom pb-3 mb-3">
+                            <div class="d-flex justify-content-between align-items-start gap-3">
+                                <div>
+                                    <div class="small text-uppercase fw-bold text-muted">
+                                        GIAR - Gestão Integrada de Atividade Religiosa
+                                    </div>
+                                    <h4 class="fw-bold mb-1 text-dark">
+                                        <i class="bi bi-file-earmark-spreadsheet-fill text-primary me-2"></i>Balancete
+                                        Contábil
+                                    </h4>
+                                    <div class="small text-muted">
+                                        Demonstrativo gerado automaticamente a partir dos lançamentos financeiros.
+                                    </div>
+                                </div>
+                                <button class="btn btn-outline-primary btn-sm no-print" onclick="window.print()">
+                                    <i class="bi bi-printer-fill me-1"></i>Imprimir Balancete
+                                </button>
+                            </div>
+                            <div class="row g-2 mt-3 small">
+                                <div class="col-md-4">
+                                    <strong>Unidade:</strong> <span id="rep-unidade">AD Cetro de Justiça</span>
+                                </div>
+                                <div class="col-md-4">
+                                    <strong>Exercício:</strong> <span id="rep-exercicio">-</span>
+                                </div>
+                                <div class="col-md-4">
+                                    <strong>Mês Referência:</strong> <span id="rep-mes-referencia">-</span>
+                                </div>
+                                <div class="col-md-4">
+                                    <strong>Valores do Balancete:</strong> <span id="rep-valores">M - No Mês</span>
+                                </div>
+                                <div class="col-md-4">
+                                    <strong>Tipo Demonstrativo:</strong>
+                                    <span id="rep-tipo">1 - Por Conta Contábil</span>
+                                </div>
+                                <div class="col-md-4">
+                                    <strong>Contas apresentadas:</strong> <span id="rep-qtd-contas">0</span>
                                 </div>
                             </div>
                         </div>
 
-                        <div class="col-12 col-md-6">
-                            <div class="card border-0 shadow-sm p-3 h-100">
-                                <h6 class="text-danger fw-bold border-bottom pb-2 mb-3">
-                                    <i class="bi bi-arrow-down-circle-fill me-2"></i>Saídas por Categoria
-                                </h6>
-                                <div class="table-responsive">
-                                    <table
-                                        class="table table-sm table-hover align-middle mb-0"
-                                        id="table-report-expenses"
-                                    >
-                                        <thead class="table-light">
-                                            <tr>
-                                                <th>TIPO / CATEGORIA</th>
-                                                <th class="text-end">QTD</th>
-                                                <th class="text-end">VALOR TOTAL</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody></tbody>
-                                        <tfoot>
-                                            <tr class="fw-bold table-danger">
-                                                <td>TOTAL SAÍDAS</td>
-                                                <td class="text-end" id="rep-total-out-count">0</td>
-                                                <td class="text-end" id="rep-total-out-amount">R$ 0,00</td>
-                                            </tr>
-                                        </tfoot>
-                                    </table>
+                        <!-- FILTROS -->
+                        <div class="row g-3 mb-4 bg-light p-3 rounded border no-print align-items-end">
+                            <div class="col-12 col-sm-5 col-md-3">
+                                <label for="rep-filter-year" class="form-label fw-bold small text-secondary"
+                                    >Ano Contábil (Exercício):</label
+                                >
+                                <select
+                                    id="rep-filter-year"
+                                    class="form-select"
+                                    onchange="renderReports(financeData)"
+                                ></select>
+                            </div>
+                            <div class="col-12 col-sm-7 col-md-4">
+                                <label for="rep-filter-month" class="form-label fw-bold small text-secondary"
+                                    >Mês Referência:</label
+                                >
+                                <select id="rep-filter-month" class="form-select">
+                                    <option value="all">Todos os Meses (Exercício)</option>
+                                    <option value="0">01 - Janeiro</option>
+                                    <option value="1">02 - Fevereiro</option>
+                                    <option value="2">03 - Março</option>
+                                    <option value="3">04 - Abril</option>
+                                    <option value="4">05 - Maio</option>
+                                    <option value="5">06 - Junho</option>
+                                    <option value="6">07 - Julho</option>
+                                    <option value="7">08 - Agosto</option>
+                                    <option value="8">09 - Setembro</option>
+                                    <option value="9">10 - Outubro</option>
+                                    <option value="10">11 - Novembro</option>
+                                    <option value="11">12 - Dezembro</option>
+                                </select>
+                            </div>
+                            <div class="col-12 col-md-5">
+                                <div class="alert alert-info py-2 mb-0 small">
+                                    <i class="bi bi-lightning-charge-fill me-1"></i>
+                                    O saldo anterior, movimentos e saldo final são recalculados automaticamente conforme
+                                    o período selecionado.
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- TABELA PROFISSIONAL DO BALANCETE CONTÁBIL -->
+                        <div class="alert alert-secondary py-2 mb-2 small">
+                            <i class="bi bi-info-circle-fill me-1"></i>
+                            <strong>Importante:</strong> cada lançamento financeiro aparece em duas contas contábeis por
+                            partida dobrada: o mesmo valor é <strong>debitado em Caixa/Banco</strong> e
+                            <strong>creditado na Receita</strong> (ou, em uma saída, debitado na Despesa e creditado em
+                            Caixa/Banco). Isso <strong>não representa duas entradas</strong>.
+                        </div>
+                        <div class="table-responsive">
+                            <table
+                                class="table table-bordered table-balancete align-middle mb-0"
+                                id="table-balancete-contabil"
+                            >
+                                <thead class="table-dark text-center">
+                                    <tr>
+                                        <th>CONTA CONTÁBIL</th>
+                                        <th class="text-start">CONTA CONTÁBIL / DESCRIÇÃO</th>
+                                        <th>SALDO ANTERIOR</th>
+                                        <th>MOVIMENTO DEVEDOR</th>
+                                        <th>MOVIMENTO CREDOR</th>
+                                        <th>MOV. LIQ.</th>
+                                        <th>SALDO</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tbody-balancete-contabil"></tbody>
+                                <tfoot class="table-secondary fw-bold" id="tfoot-balancete-contabil"></tfoot>
+                            </table>
+                        </div>
+
+                        <!-- RESUMO POR CATEGORIA (ENTRADAS x SAÍDAS) -->
+                        <div class="row g-3 mt-4">
+                            <div class="col-12 col-md-6">
+                                <div class="card border-0 shadow-sm p-3">
+                                    <h6 class="text-success fw-bold border-bottom pb-2 mb-3">
+                                        <i class="bi bi-arrow-up-circle-fill me-2"></i>Entradas por Categoria
+                                    </h6>
+                                    <div class="table-responsive">
+                                        <table
+                                            class="table table-sm table-hover align-middle mb-0"
+                                            id="table-report-incomes"
+                                        >
+                                            <thead class="table-light">
+                                                <tr>
+                                                    <th>CATEGORIA</th>
+                                                    <th class="text-end">QTD</th>
+                                                    <th class="text-end">VALOR TOTAL</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody></tbody>
+                                            <tfoot>
+                                                <tr class="fw-bold table-success">
+                                                    <td>TOTAL ENTRADAS</td>
+                                                    <td class="text-end" id="rep-total-in-count">0</td>
+                                                    <td class="text-end" id="rep-total-in-amount">R$ 0,00</td>
+                                                </tr>
+                                            </tfoot>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-12 col-md-6">
+                                <div class="card border-0 shadow-sm p-3">
+                                    <h6 class="text-danger fw-bold border-bottom pb-2 mb-3">
+                                        <i class="bi bi-arrow-down-circle-fill me-2"></i>Saídas por Categoria
+                                    </h6>
+                                    <div class="table-responsive">
+                                        <table
+                                            class="table table-sm table-hover align-middle mb-0"
+                                            id="table-report-expenses"
+                                        >
+                                            <thead class="table-light">
+                                                <tr>
+                                                    <th>CATEGORIA</th>
+                                                    <th class="text-end">QTD</th>
+                                                    <th class="text-end">VALOR TOTAL</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody></tbody>
+                                            <tfoot>
+                                                <tr class="fw-bold table-danger">
+                                                    <td>TOTAL SAÍDAS</td>
+                                                    <td class="text-end" id="rep-total-out-count">0</td>
+                                                    <td class="text-end" id="rep-total-out-amount">R$ 0,00</td>
+                                                </tr>
+                                            </tfoot>
+                                        </table>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -590,31 +691,16 @@
                         <div class="modal-header bg-primary text-white text-center d-block">
                             <h5 class="modal-title">AD Cetro de Justiça</h5>
                             <small class="text-white-50">GIAR - Gestão Integrada de Atividade Religiosa</small>
-                            <br />
                             <small class="text-white-50">Sistema Sustentável</small>
                         </div>
                         <div class="modal-body p-4">
                             <div class="mb-3">
                                 <label class="form-label">E-mail Institucional</label>
-                                <input
-                                    type="email"
-                                    class="form-control"
-                                    id="login-email"
-                                    placeholder="exemplo@cj.com.br"
-                                    value=""
-                                    required
-                                />
+                                <input type="email" class="form-control" id="login-email" placeholder="exemplo@cj.com.br" value="" required />
                             </div>
                             <div class="mb-3">
                                 <label class="form-label">Senha</label>
-                                <input
-                                    type="password"
-                                    class="form-control"
-                                    id="login-password"
-                                    placeholder="******"
-                                    value=""
-                                    required
-                                />
+                                <input type="password" class="form-control" id="login-password" placeholder="******" value="" required />
                             </div>
 
                             <div
