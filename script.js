@@ -15,15 +15,119 @@ const modalLogin = new bootstrap.Modal(document.getElementById("modalLogin"));
 const modalStudent = new bootstrap.Modal(document.getElementById("modalStudent"));
 const modalTx = new bootstrap.Modal(document.getElementById("modalTransaction"));
 
-// Variáveis globais para os gráficos
+/* Variáveis globais para os gráficos */
 let financeChart = null;
 let classChart = null;
 
-// Variável global para cache da lista de alunos
+/* Variável global para cache da lista de alunos */
 let globalStudentsCache = [];
 let globalFinanceCache = [];
 
-/* Funções auxiliares de datas */
+/* Plano de contas dinâmico do balancete contábil */
+const BALANCETE_ACCOUNT_VERSION = 1;
+const BALANCETE_ACCOUNTS = {
+    cash: { codigo: "111110100", titulo: "CAIXA", natureza: "D" },
+    bank: { codigo: "111110301", titulo: "BANCOS / CONTA CORRENTE", natureza: "D" },
+    income: { natureza: "C", prefixo: "4" },
+    expense: { natureza: "D", prefixo: "5" },
+};
+
+function normalizeText(value) {
+    return String(value || "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .trim();
+}
+
+function accountHash(text) {
+    let hash = 2166136261;
+    for (let i = 0; i < text.length; i++) {
+        hash ^= text.charCodeAt(i);
+        hash = Math.imul(hash, 16777619);
+    }
+    return Math.abs(hash >>> 0);
+}
+
+function dynamicAccountCode(prefix, label) {
+    const n = (accountHash(normalizeText(label)) % 899999) + 100000;
+    return `${prefix}11${String(n).padStart(6, "0")}`;
+}
+
+function getFinancialAssetAccount(method) {
+    const m = normalizeText(method);
+    if (!m || m.includes("dinheiro") || m.includes("especie") || m.includes("caixa")) return BALANCETE_ACCOUNTS.cash;
+    return BALANCETE_ACCOUNTS.bank;
+}
+
+function getDynamicIncomeAccount(category) {
+    const title = `RECEITAS - ${String(category || "OUTRAS RECEITAS")
+        .trim()
+        .toUpperCase()}`;
+    return { codigo: dynamicAccountCode("4", title), titulo: title, natureza: "C" };
+}
+
+function getDynamicExpenseAccount(category) {
+    const title = `DESPESAS - ${String(category || "OUTRAS DESPESAS")
+        .trim()
+        .toUpperCase()}`;
+    return { codigo: dynamicAccountCode("5", title), titulo: title, natureza: "D" };
+}
+
+/**
+ * Converte cada lançamento financeiro em uma partida simples de débito/crédito:
+ * Entrada  = débito no caixa/banco + crédito na receita.
+ * Saída    = débito na despesa + crédito no caixa/banco.
+ * Não existem saldos iniciais fixos: o saldo anterior é calculado pelos lançamentos
+ * anteriores ao período selecionado.
+ */
+function buildBalancetePostings(finance, year, month) {
+    const periodStart = month === "all" ? new Date(year, 0, 1) : new Date(year, Number(month), 1);
+    const periodEnd = month === "all" ? new Date(year + 1, 0, 1) : new Date(year, Number(month) + 1, 1);
+    const accounts = new Map();
+
+    function ensureAccount(account) {
+        if (!accounts.has(account.codigo))
+            accounts.set(account.codigo, {
+                ...account,
+                saldoAnterior: 0,
+                devedor: 0,
+                credor: 0,
+            });
+        return accounts.get(account.codigo);
+    }
+
+    function addPosting(account, date, debit, credit) {
+        const row = ensureAccount(account);
+        const dt = parseLocalDate(date);
+        const amountDebit = Number(debit) || 0;
+        const amountCredit = Number(credit) || 0;
+        if (dt < periodStart) {
+            row.saldoAnterior += row.natureza === "D" ? amountDebit - amountCredit : amountCredit - amountDebit;
+        } else if (dt >= periodStart && dt < periodEnd) {
+            row.devedor += amountDebit;
+            row.credor += amountCredit;
+        }
+    }
+
+    (finance || []).forEach((t) => {
+        const value = Number(t.amount) || 0;
+        if (!t.date || value <= 0) return;
+        const type = normalizeText(t.type);
+        const asset = getFinancialAssetAccount(t.method);
+        if (type === "entrada") {
+            addPosting(asset, t.date, value, 0);
+            addPosting(getDynamicIncomeAccount(t.category), t.date, 0, value);
+        } else if (type === "saida") {
+            addPosting(getDynamicExpenseAccount(t.category), t.date, value, 0);
+            addPosting(asset, t.date, 0, value);
+        }
+    });
+
+    return { accounts, periodStart, periodEnd };
+}
+
+/* Funçõies auxiliares de data */
 function parseLocalDate(dateStr) {
     if (!dateStr) return new Date();
 
@@ -104,12 +208,12 @@ async function apiPost(sheetName, actionType, payload) {
 
         await fetch(API_URL, {
             method: "POST",
-            mode: "no-cors", // Evita bloqueio de CORS com o Apps Script
+            mode: "no-cors" /* Evita bloqueio de CORS com o Apps Script */,
             headers: { "Content-Type": "text/plain;charset=utf-8" },
             body: JSON.stringify(bodyObj),
         });
 
-        // Aguarda 1.5 segundos para garantir o processamento na planilha
+        /* Aguarda 1.5 segundos para garantir o processamento na planilha */
         await new Promise((r) => setTimeout(r, 1500));
         return { success: true };
     } catch (err) {
@@ -153,18 +257,18 @@ document.getElementById("btn-logout").addEventListener("click", () => {
     modalLogin.show();
 });
 
-/* Controle de permissões (RBAC) */
+/* Controle de permissão (RBAC) */
 function applyUserPermissions(user) {
     const role = (user.role || "").toLowerCase().trim();
     const isSecretary = role === "secretária" || role === "secretaria" || role === "secretario";
 
-    // Oculta/Exibe os itens da navegação conforme o perfil
+    /* Oculta/Exibe os itens da navegação conforme o perfil */
     const finNavItems = document.querySelectorAll(".nav-role-financeiro");
     finNavItems.forEach((el) => {
         el.style.display = isSecretary ? "none" : "";
     });
 
-    // Garante redirecionamento para o Dashboard caso o usuário seja secretária e tente acessar abas restritas
+    /* Garante redirecionamento para o Dashboard caso o usuário seja secretária e tente acessar abas restritas */
     if (isSecretary) {
         const activeTab = document.querySelector("#main-nav .nav-link.active");
         if (activeTab) {
@@ -180,7 +284,7 @@ function applyUserPermissions(user) {
     }
 }
 
-/* Busca de Cep */
+/* Busca de CEP */
 document.getElementById("student-cep").addEventListener("blur", async (e) => {
     const cep = e.target.value.replace(/\D/g, "");
     if (cep.length === 8) {
@@ -205,7 +309,7 @@ async function renderApp() {
     if (!user) return;
     document.getElementById("user-name").textContent = user.name;
 
-    // Aplica o filtro de permissões baseado na role do usuário
+    /* Aplica o filtro de permissões baseado na role do usuário */
     applyUserPermissions(user);
 
     try {
@@ -225,21 +329,21 @@ async function renderApp() {
     }
 }
 
-/* Renderizar gabarito de dizimistas */
+/* Renderizar gabarito de dizmistas */
 function renderDizimistasGabarito() {
     const selectedYear = Number(document.getElementById("diz-filter-year").value);
     const selectedMonth = document.getElementById("diz-filter-month").value;
     const selectedStatus = document.getElementById("diz-filter-status").value;
     const searchVal = (document.getElementById("diz-filter-search").value || "").toLowerCase().trim();
 
-    // Filtra membros dizimistas cadastrados
+    /* Filtra membros dizimistas cadastrados */
     let dizimistas = globalStudentsCache.filter((s) => {
-        const isDiz = s.financial === "Dízimo" || !s.financial; // Considera dízimo por padrão
+        const isDiz = s.financial === "Dízimo" || !s.financial; /* Considera dízimo por padrão */
         const matchName = (s.name || "").toLowerCase().includes(searchVal);
         return isDiz && matchName;
     });
 
-    // Mapeamento de lançamentos de dízimos do ano selecionado
+    /* Mapeamento de lançamentos de dízimos do ano selecionado */
     const dizimoTxs = globalFinanceCache.filter((t) => {
         if (!t.date || t.type !== "Entrada") return false;
         const cat = (t.category || "").toLowerCase();
@@ -251,7 +355,7 @@ function renderDizimistasGabarito() {
     const monthNames = ["JAN", "FEV", "MAR", "ABR", "MAI", "JUN", "JUL", "AGO", "SET", "OUT", "NOV", "DEZ"];
     const tableHeaderTr = document.getElementById("diz-table-header");
 
-    // Ajusta o cabeçalho se um mês específico for selecionado
+    /* Ajusta o cabeçalho se um mês específico for selecionado */
     if (selectedMonth !== "all") {
         const mIdx = Number(selectedMonth);
         tableHeaderTr.innerHTML = `
@@ -281,7 +385,7 @@ function renderDizimistasGabarito() {
     const rowsToRender = [];
 
     dizimistas.forEach((diz) => {
-        // Mapeia dízimos deste membro pelos 12 meses
+        /* Mapeia dízimos deste membro pelos 12 meses */
         const monthsData = Array(12)
             .fill(null)
             .map(() => ({ paid: false, amount: 0, methods: [], dates: [] }));
@@ -298,7 +402,7 @@ function renderDizimistasGabarito() {
 
         let dizTotalYear = monthsData.reduce((acc, curr) => acc + curr.amount, 0);
 
-        // Lógica de filtro por status
+        /* Lógica de filtro por status */
         let hasContribution = false;
         if (selectedMonth === "all") {
             hasContribution = monthsData.some((m) => m.paid);
@@ -373,20 +477,20 @@ function renderDizimistasGabarito() {
         });
     }
 
-    // Atualiza cards estatísticos do gabarito
+    /* Atualiza cards estatísticos do gabarito */
     document.getElementById("diz-stat-total").textContent = dizimistas.length;
     document.getElementById("diz-stat-paid").textContent = totalPaidInPeriodCount;
     document.getElementById("diz-stat-unpaid").textContent = totalUnpaidInPeriodCount;
     document.getElementById("diz-stat-amount").textContent = fmtCurr(totalDizimoAmountInPeriod);
 }
 
-/* Eventos dos filtros do gabarito dos dizimistas */
+/* Eventos dos filtros do gabarito de dizimistas */
 document.getElementById("diz-filter-year").addEventListener("change", renderDizimistasGabarito);
 document.getElementById("diz-filter-month").addEventListener("change", renderDizimistasGabarito);
 document.getElementById("diz-filter-status").addEventListener("change", renderDizimistasGabarito);
 document.getElementById("diz-filter-search").addEventListener("input", renderDizimistasGabarito);
 
-/* Renderizar Dashboard */
+/* Renderizar dashboard */
 function renderDashboard(students, finance) {
     const activeStudents = students.filter((s) => s.status === "Ativo");
     document.getElementById("dash-active-students").textContent = activeStudents.length;
@@ -796,9 +900,12 @@ document.getElementById("form-student").addEventListener("submit", async (e) => 
 });
 
 async function deleteStudent(id) {
-    if (confirm("Deseja realmente remover este membro do Google Sheets?")) {
+    if (!confirm("Deseja realmente excluir este cadastro?")) return;
+    try {
         await apiPost("Membros", "delete", id);
         renderApp();
+    } catch (err) {
+        alert("Erro ao excluir membro.");
     }
 }
 
@@ -1058,84 +1165,186 @@ async function deleteTx(id) {
     }
 }
 
-/* Relatórios */
+/* Popular opções de ano dinamicamente */
+function populateYearFilter(finance) {
+    const yearSelect = document.getElementById("rep-filter-year");
+    if (!yearSelect) return;
+
+    const yearsSet = new Set();
+    (finance || []).forEach((t) => {
+        if (t.date) {
+            const dt = parseLocalDate(t.date);
+            if (!isNaN(dt.getFullYear())) {
+                yearsSet.add(dt.getFullYear());
+            }
+        }
+    });
+
+    const currentYear = new Date().getFullYear();
+    yearsSet.add(currentYear);
+
+    const sortedYears = Array.from(yearsSet).sort((a, b) => b - a);
+
+    yearSelect.innerHTML = "";
+    sortedYears.forEach((year) => {
+        const option = document.createElement("option");
+        option.value = year;
+        option.textContent = year;
+        if (year === currentYear) {
+            option.selected = true;
+        }
+        yearSelect.appendChild(option);
+    });
+}
+
+/* Relatório: Balancete resumo contábil */
 function renderReports(finance) {
+    /* Garante que o select tenha opções antes de ler seu valor */
+    const yearSelect = document.getElementById("rep-filter-year");
+    if (yearSelect && yearSelect.options.length === 0) {
+        populateYearFilter(finance);
+    }
+    const yearSel = Number(document.getElementById("rep-filter-year").value) || new Date().getFullYear();
+    const monthSel = document.getElementById("rep-filter-month").value;
+
+    /* 1. PRIMEIRO: Filtra as transações pelo Ano e Mês selecionados */
+    const txsFiltradas = finance.filter((t) => {
+        if (!t.date) return false;
+        const dt = parseLocalDate(t.date);
+        if (dt.getFullYear() !== yearSel) return false;
+        if (monthSel !== "all" && dt.getMonth() !== Number(monthSel)) return false;
+        return true;
+    });
+
+    /* 2. SEGUNDO: Gera o balancete passando apenas 'txsFiltradas' (e não o 'finance' bruto) */
+    const { accounts } = buildBalancetePostings(txsFiltradas, yearSel, monthSel);
+
+    /* Renderizar tabela do balancete */
+    const tbody = document.getElementById("tbody-balancete-contabil");
+    const tfoot = document.getElementById("tfoot-balancete-contabil");
+    if (tbody) tbody.innerHTML = "";
+
+    let totSaldoAnt = 0;
+    let totDev = 0;
+    let totCred = 0;
+    let totLiq = 0;
+    let totSaldoAtual = 0;
+    let qtdContas = 0;
+
+    const sortedAccounts = Array.from(accounts.values()).sort((a, b) => a.codigo.localeCompare(b.codigo));
+
+    sortedAccounts.forEach((item) => {
+        const movLiq = item.devedor - item.credor;
+        const saldoAtual = item.saldoAnterior + movLiq;
+
+        totSaldoAnt += item.saldoAnterior;
+        totDev += item.devedor;
+        totCred += item.credor;
+        totLiq += movLiq;
+        totSaldoAtual += saldoAtual;
+        qtdContas++;
+
+        if (tbody) {
+            tbody.innerHTML += `
+          <tr>
+            <td class="text-center fw-bold text-secondary">${item.codigo}</td>
+            <td class="fw-semibold">${item.titulo}</td>
+            <td class="text-end">${fmtCurr(item.saldoAnterior)} ${item.natureza}</td>
+            <td class="text-end text-success">${fmtCurr(item.devedor)}</td>
+            <td class="text-end text-danger">${fmtCurr(item.credor)}</td>
+            <td class="text-end fw-bold ${movLiq >= 0 ? "text-success" : "text-danger"}">${fmtCurr(movLiq)}</td>
+            <td class="text-end fw-bold">${fmtCurr(saldoAtual)} ${item.natureza}</td>
+          </tr>
+        `;
+        }
+    });
+
+    if (tfoot) {
+        tfoot.innerHTML = `
+        <tr>
+          <td colspan="2" class="text-start">TOTAL GERAL DO BALANCETE CONTÁBIL</td>
+          <td>${fmtCurr(totSaldoAnt)}</td>
+          <td class="text-success">${fmtCurr(totDev)}</td>
+          <td class="text-danger">${fmtCurr(totCred)}</td>
+          <td class="${totLiq >= 0 ? "text-success" : "text-danger"}">${fmtCurr(totLiq)}</td>
+          <td>${fmtCurr(totSaldoAtual)}</td>
+        </tr>
+      `;
+    }
+
+    /* Atualiza cabeçalho com o exercício filtrado */
+    const elExercicio = document.getElementById("rep-exercicio");
+    const elMesRef = document.getElementById("rep-mes-referencia");
+    const elQtdContas = document.getElementById("rep-qtd-contas");
+
+    if (elExercicio) elExercicio.textContent = yearSel;
+    if (elMesRef)
+        elMesRef.textContent =
+            monthSel === "all" ? "Todos os Meses" : (Number(monthSel) + 1).toString().padStart(2, "0");
+    if (elQtdContas) elQtdContas.textContent = qtdContas;
+
+    renderCategorySummaries(txsFiltradas);
+}
+
+function renderCategorySummaries(finance) {
     const tbodyIn = document.querySelector("#table-report-incomes tbody");
     const tbodyOut = document.querySelector("#table-report-expenses tbody");
-
     tbodyIn.innerHTML = "";
     tbodyOut.innerHTML = "";
 
     const incomeCategories = {};
     const expenseCategories = {};
-
-    let totalInCount = 0;
-    let totalInAmount = 0;
-    let totalOutCount = 0;
-    let totalOutAmount = 0;
+    let totalInCount = 0,
+        totalInAmount = 0;
+    let totalOutCount = 0,
+        totalOutAmount = 0;
 
     finance.forEach((t) => {
         const val = Number(t.amount) || 0;
         const catName = t.category || "Geral / Outros";
 
         if (t.type === "Entrada") {
-            if (!incomeCategories[catName]) {
-                incomeCategories[catName] = { count: 0, amount: 0 };
-            }
-            incomeCategories[catName].count += 1;
+            if (!incomeCategories[catName]) incomeCategories[catName] = { count: 0, amount: 0 };
+            incomeCategories[catName].count++;
             incomeCategories[catName].amount += val;
-
-            totalInCount += 1;
+            totalInCount++;
             totalInAmount += val;
         } else if (t.type === "Saída") {
-            if (!expenseCategories[catName]) {
-                expenseCategories[catName] = { count: 0, amount: 0 };
-            }
-            expenseCategories[catName].count += 1;
+            if (!expenseCategories[catName]) expenseCategories[catName] = { count: 0, amount: 0 };
+            expenseCategories[catName].count++;
             expenseCategories[catName].amount += val;
-
-            totalOutCount += 1;
+            totalOutCount++;
             totalOutAmount += val;
         }
     });
 
-    const inKeys = Object.keys(incomeCategories);
-    if (inKeys.length === 0) {
-        tbodyIn.innerHTML =
-            '<tr><td colspan="3" class="text-center text-muted py-3">Nenhuma entrada registrada.</td></tr>';
-    } else {
-        inKeys.forEach((cat) => {
-            const item = incomeCategories[cat];
-            tbodyIn.innerHTML += `<tr>
-        <td><i class="bi bi-tag-fill me-2 text-success opacity-75"></i>${cat}</td>
-        <td class="text-end">${item.count}</td>
-        <td class="text-end fw-semibold text-success">${fmtCurr(item.amount)}</td>
-      </tr>`;
-        });
-    }
+    Object.keys(incomeCategories).forEach((cat) => {
+        const item = incomeCategories[cat];
+        tbodyIn.innerHTML += `<tr>
+            <td><i class="bi bi-tag-fill me-2 text-success opacity-75"></i>${cat}</td>
+            <td class="text-end">${item.count}</td>
+            <td class="text-end fw-semibold text-success">${fmtCurr(item.amount)}</td>
+        </tr>`;
+    });
 
-    const outKeys = Object.keys(expenseCategories);
-    if (outKeys.length === 0) {
-        tbodyOut.innerHTML =
-            '<tr><td colspan="3" class="text-center text-muted py-3">Nenhuma saída registrada.</td></tr>';
-    } else {
-        outKeys.forEach((cat) => {
-            const item = expenseCategories[cat];
-            tbodyOut.innerHTML += `<tr>
-        <td><i class="bi bi-tag-fill me-2 text-danger opacity-75"></i>${cat}</td>
-        <td class="text-end">${item.count}</td>
-        <td class="text-end fw-semibold text-danger">${fmtCurr(item.amount)}</td>
-      </tr>`;
-        });
-    }
+    Object.keys(expenseCategories).forEach((cat) => {
+        const item = expenseCategories[cat];
+        tbodyOut.innerHTML += `<tr>
+            <td><i class="bi bi-tag-fill me-2 text-danger opacity-75"></i>${cat}</td>
+            <td class="text-end">${item.count}</td>
+            <td class="text-end fw-semibold text-danger">${fmtCurr(item.amount)}</td>
+        </tr>`;
+    });
 
     document.getElementById("rep-total-in-count").textContent = totalInCount;
     document.getElementById("rep-total-in-amount").textContent = fmtCurr(totalInAmount);
-
     document.getElementById("rep-total-out-count").textContent = totalOutCount;
     document.getElementById("rep-total-out-amount").textContent = fmtCurr(totalOutAmount);
 }
 
+/* Eventos dos filtros de relatório */
+document.getElementById("rep-filter-year").addEventListener("change", () => renderReports(globalFinanceCache));
+document.getElementById("rep-filter-month").addEventListener("change", () => renderReports(globalFinanceCache));
 function printReportLandscape() {
     window.print();
 }
