@@ -1,5 +1,5 @@
 :root {
-    /* PALETA DE CORES MODERNA E SUAVE */
+    /* Paleta de cores modernas e suave */
     --brand-dark: #1e293b; /* Slate 800 */
     --brand-medium: #334155; /* Slate 700 */
     --brand-accent: #3b82f6; /* Blue 500 suave */
@@ -438,9 +438,12 @@ footer.footer-fixed {
 /* Impressão */
 @media print {
     @page {
-        size: landscape;
+        /* Força o tamanho da página A4 na orientação Paisagem */
+        size: A4 landscape !important;
         margin: 1cm;
     }
+
+    /* Remove menus, botões e elementos indesejados */
     .top-bar,
     .nav-tabs,
     .btn,
@@ -448,13 +451,34 @@ footer.footer-fixed {
     .navbar-custom {
         display: none !important;
     }
+
+    /* Garante que o body e containers ocupem toda a largura em paisagem */
+    html,
     body {
+        width: 100% !important;
+        max-width: 100% !important;
         background: #ffffff !important;
         padding: 0 !important;
+        margin: 0 !important;
+        overflow: visible !important;
     }
+
+    .container,
+    .container-fluid {
+        width: 100% !important;
+        max-width: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+
     .card-clean,
     .card {
         border: none !important;
         box-shadow: none !important;
+    }
+
+    /* Ajuste para garantir que tabelas longas não cortem lateralmente */
+    table {
+        width: 100% !important;
     }
 }
