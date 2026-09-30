@@ -3,11 +3,100 @@ const API_URL =
     "https://script.google.com/macros/s/AKfycbw4FdA3xTxXIZ1mo6dgBuKhWGHT-mYxLHfJo9K688r3nCHjqIR1Tsdn98qmErp1ko5K/exec";
 
 const uid = () => Date.now().toString(36) + Math.random().toString(36).substring(2);
-const fmtCurr = (v) => (Number(v) || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+const fmtCurr = (v) => (Number(v) || 0).toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL"
+});
 
 function showLoading(show = true) {
     const overlay = document.getElementById("loading-overlay");
     if (overlay) overlay.style.display = show ? "flex" : "none";
+}
+
+/**
+ * Sistema centralizado de notificações Bootstrap Toast.
+ * Tipos: success, danger, warning e info.
+ */
+function showToast(message, type = "info", title = "") {
+    const container = document.getElementById("giar-toast-container");
+    if (!container || typeof bootstrap === "undefined") return;
+
+    const config = {
+        success: {
+            title: "Sucesso",
+            icon: "bi-check-circle-fill"
+        },
+        danger: {
+            title: "Erro",
+            icon: "bi-exclamation-triangle-fill"
+        },
+        warning: {
+            title: "Atenção",
+            icon: "bi-exclamation-circle-fill"
+        },
+        info: {
+            title: "Informação",
+            icon: "bi-info-circle-fill"
+        }
+    };
+
+    const selected = config[type] || config.info;
+    const safeType = Object.prototype.hasOwnProperty.call(config, type) ? type : "info";
+
+    const toastEl = document.createElement("div");
+    toastEl.className = `toast giar-toast toast-${safeType}`;
+    toastEl.setAttribute("role", "alert");
+    toastEl.setAttribute("aria-live", "assertive");
+    toastEl.setAttribute("aria-atomic", "true");
+
+    const header = document.createElement("div");
+    header.className = "toast-header";
+
+    const icon = document.createElement("span");
+    icon.className = "toast-icon me-2";
+    icon.innerHTML = `<i class="bi ${selected.icon}"></i>`;
+
+    const strong = document.createElement("strong");
+    strong.className = "me-auto";
+    strong.textContent = title || selected.title;
+
+    const time = document.createElement("small");
+    time.className = "toast-time me-2";
+    time.textContent = "Agora";
+
+    const close = document.createElement("button");
+    close.type = "button";
+    close.className = "btn-close";
+    close.setAttribute("data-bs-dismiss", "toast");
+    close.setAttribute("aria-label", "Fechar");
+
+    header.append(icon, strong, time, close);
+
+    const body = document.createElement("div");
+    body.className = "toast-body";
+    body.textContent = message;
+
+    toastEl.append(header, body);
+    container.appendChild(toastEl);
+
+    const toastBootstrap = bootstrap.Toast.getOrCreateInstance(toastEl, {
+        autohide: true,
+        delay: 4500
+    });
+
+    toastEl.addEventListener("hidden.bs.toast", () => toastEl.remove(), {
+        once: true
+    });
+    toastBootstrap.show();
+}
+
+/* Compatibilidade com o exemplo oficial do Bootstrap */
+const toastTrigger = document.getElementById("liveToastBtn");
+const toastLiveExample = document.getElementById("liveToast");
+
+if (toastTrigger && toastLiveExample) {
+    const toastBootstrap = bootstrap.Toast.getOrCreateInstance(toastLiveExample);
+    toastTrigger.addEventListener("click", () => toastBootstrap.show());
 }
 
 /* Modais Bootstrap */
@@ -26,10 +115,24 @@ let globalFinanceCache = [];
 /* Plano de contas dinâmico do balancete contábil */
 const BALANCETE_ACCOUNT_VERSION = 1;
 const BALANCETE_ACCOUNTS = {
-    cash: { codigo: "111110100", titulo: "CAIXA", natureza: "D" },
-    bank: { codigo: "111110301", titulo: "BANCOS / CONTA CORRENTE", natureza: "D" },
-    income: { natureza: "C", prefixo: "4" },
-    expense: { natureza: "D", prefixo: "5" },
+    cash: {
+        codigo: "111110100",
+        titulo: "CAIXA",
+        natureza: "D"
+    },
+    bank: {
+        codigo: "111110301",
+        titulo: "BANCOS / CONTA CORRENTE",
+        natureza: "D"
+    },
+    income: {
+        natureza: "C",
+        prefixo: "4"
+    },
+    expense: {
+        natureza: "D",
+        prefixo: "5"
+    },
 };
 
 function normalizeText(value) {
@@ -64,14 +167,22 @@ function getDynamicIncomeAccount(category) {
     const title = `RECEITAS - ${String(category || "OUTRAS RECEITAS")
         .trim()
         .toUpperCase()}`;
-    return { codigo: dynamicAccountCode("4", title), titulo: title, natureza: "C" };
+    return {
+        codigo: dynamicAccountCode("4", title),
+        titulo: title,
+        natureza: "C"
+    };
 }
 
 function getDynamicExpenseAccount(category) {
     const title = `DESPESAS - ${String(category || "OUTRAS DESPESAS")
         .trim()
         .toUpperCase()}`;
-    return { codigo: dynamicAccountCode("5", title), titulo: title, natureza: "D" };
+    return {
+        codigo: dynamicAccountCode("5", title),
+        titulo: title,
+        natureza: "D"
+    };
 }
 
 /**
@@ -124,7 +235,11 @@ function buildBalancetePostings(finance, year, month) {
         }
     });
 
-    return { accounts, periodStart, periodEnd };
+    return {
+        accounts,
+        periodStart,
+        periodEnd
+    };
 }
 
 /* Funçõies auxiliares de data */
@@ -167,7 +282,7 @@ function apiGet(sheetName) {
     return new Promise((resolve, reject) => {
         const callbackName = "jsonp_callback_" + Math.round(100000 * Math.random());
 
-        window[callbackName] = function (data) {
+        window[callbackName] = function(data) {
             delete window[callbackName];
             document.body.removeChild(script);
             showLoading(false);
@@ -180,7 +295,7 @@ function apiGet(sheetName) {
 
         const script = document.createElement("script");
         script.src = `${API_URL}?action=read&sheet=${encodeURIComponent(sheetName)}&callback=${callbackName}`;
-        script.onerror = function () {
+        script.onerror = function() {
             delete window[callbackName];
             document.body.removeChild(script);
             showLoading(false);
@@ -208,14 +323,18 @@ async function apiPost(sheetName, actionType, payload) {
 
         await fetch(API_URL, {
             method: "POST",
-            mode: "no-cors" /* Evita bloqueio de CORS com o Apps Script */,
-            headers: { "Content-Type": "text/plain;charset=utf-8" },
+            mode: "no-cors" /* Evita bloqueio de CORS com o Apps Script */ ,
+            headers: {
+                "Content-Type": "text/plain;charset=utf-8"
+            },
             body: JSON.stringify(bodyObj),
         });
 
         /* Aguarda 1.5 segundos para garantir o processamento na planilha */
         await new Promise((r) => setTimeout(r, 1500));
-        return { success: true };
+        return {
+            success: true
+        };
     } catch (err) {
         console.error("Erro no apiPost:", err);
         throw err;
@@ -242,12 +361,13 @@ document.getElementById("form-login").addEventListener("submit", async (e) => {
             sessionStorage.setItem("giar_active_user", JSON.stringify(user));
             document.body.classList.remove("unauthenticated");
             modalLogin.hide();
+            showToast(`Bem-vindo(a), ${user.name || user.email}!`, "success", "Login realizado");
             renderApp();
         } else {
             alertEl.classList.remove("d-none");
         }
     } catch (err) {
-        alert("Erro ao realizar login. Tente novamente.");
+        showToast("Erro ao realizar login. Tente novamente.", "danger", "Falha no login");
     }
 });
 
@@ -388,7 +508,12 @@ function renderDizimistasGabarito() {
         /* Mapeia dízimos deste membro pelos 12 meses */
         const monthsData = Array(12)
             .fill(null)
-            .map(() => ({ paid: false, amount: 0, methods: [], dates: [] }));
+            .map(() => ({
+                paid: false,
+                amount: 0,
+                methods: [],
+                dates: []
+            }));
 
         dizimoTxs.forEach((tx) => {
             if ((tx.student || "").trim().toLowerCase() === (diz.name || "").trim().toLowerCase()) {
@@ -422,7 +547,12 @@ function renderDizimistasGabarito() {
             totalDizimoAmountInPeriod += monthsData[Number(selectedMonth)].amount;
         }
 
-        rowsToRender.push({ diz, monthsData, dizTotalYear, hasContribution });
+        rowsToRender.push({
+            diz,
+            monthsData,
+            dizTotalYear,
+            hasContribution
+        });
     });
 
     if (rowsToRender.length === 0) {
@@ -431,7 +561,11 @@ function renderDizimistasGabarito() {
     } else {
         rowsToRender.sort((a, b) => (a.diz.name || "").localeCompare(b.diz.name || ""));
 
-        rowsToRender.forEach(({ diz, monthsData, dizTotalYear }) => {
+        rowsToRender.forEach(({
+            diz,
+            monthsData,
+            dizTotalYear
+        }) => {
             let rowHtml = "";
 
             if (selectedMonth === "all") {
@@ -455,9 +589,9 @@ function renderDizimistasGabarito() {
                 const mIdx = Number(selectedMonth);
                 const mData = monthsData[mIdx];
                 const dt = mData.dates[0] ? parseLocalDate(mData.dates[0]) : null;
-                const formattedDt = dt
-                    ? `${String(dt.getDate()).padStart(2, "0")}/${String(dt.getMonth() + 1).padStart(2, "0")}/${dt.getFullYear()}`
-                    : "-";
+                const formattedDt = dt ?
+                    `${String(dt.getDate()).padStart(2, "0")}/${String(dt.getMonth() + 1).padStart(2, "0")}/${dt.getFullYear()}` :
+                    "-";
 
                 rowHtml = `<tr>
             <td class="text-start fw-semibold">${diz.name}</td>
@@ -587,18 +721,16 @@ function renderDashboard(students, finance) {
 
         const data = {
             labels: labels,
-            datasets: [
-                {
-                    label: "Saldo Mensal (R$)",
-                    data: saldosMensais,
-                    backgroundColor: saldosMensais.map((v) =>
-                        v >= 0 ? "rgba(16, 185, 129, 0.75)" : "rgba(239, 68, 68, 0.75)"
-                    ),
-                    borderColor: saldosMensais.map((v) => (v >= 0 ? "rgb(16, 185, 129)" : "rgb(239, 68, 68)")),
-                    borderWidth: 1,
-                    borderRadius: 6,
-                },
-            ],
+            datasets: [{
+                label: "Saldo Mensal (R$)",
+                data: saldosMensais,
+                backgroundColor: saldosMensais.map((v) =>
+                    v >= 0 ? "rgba(16, 185, 129, 0.75)" : "rgba(239, 68, 68, 0.75)"
+                ),
+                borderColor: saldosMensais.map((v) => (v >= 0 ? "rgb(16, 185, 129)" : "rgb(239, 68, 68)")),
+                borderWidth: 1,
+                borderRadius: 6,
+            }, ],
         };
 
         if (financeChart) {
@@ -613,12 +745,17 @@ function renderDashboard(students, finance) {
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: {
-                        legend: { display: false },
+                        legend: {
+                            display: false
+                        },
                         title: {
                             display: true,
                             text: `Saldo Mensal - Ano ${ano}`,
                             color: "#64748b",
-                            font: { size: 14, weight: "600" },
+                            font: {
+                                size: 14,
+                                weight: "600"
+                            },
                         },
                         tooltip: {
                             callbacks: {
@@ -629,7 +766,9 @@ function renderDashboard(students, finance) {
                     scales: {
                         y: {
                             beginAtZero: true,
-                            grid: { color: "#f1f5f9" },
+                            grid: {
+                                color: "#f1f5f9"
+                            },
                             ticks: {
                                 callback: (value) =>
                                     value.toLocaleString("pt-BR", {
@@ -641,7 +780,9 @@ function renderDashboard(students, finance) {
                             },
                         },
                         x: {
-                            grid: { display: false },
+                            grid: {
+                                display: false
+                            },
                         },
                     },
                 },
@@ -684,14 +825,12 @@ function renderDashboard(students, finance) {
                 type: "doughnut",
                 data: {
                     labels: labelsTurmas,
-                    datasets: [
-                        {
-                            data: dataTurmas,
-                            backgroundColor: coresTurmas.slice(0, labelsTurmas.length),
-                            borderWidth: 2,
-                            borderColor: "#ffffff",
-                        },
-                    ],
+                    datasets: [{
+                        data: dataTurmas,
+                        backgroundColor: coresTurmas.slice(0, labelsTurmas.length),
+                        borderWidth: 2,
+                        borderColor: "#ffffff",
+                    }, ],
                 },
                 options: {
                     responsive: true,
@@ -701,7 +840,9 @@ function renderDashboard(students, finance) {
                             position: "bottom",
                             labels: {
                                 boxWidth: 12,
-                                font: { size: 11 },
+                                font: {
+                                    size: 11
+                                },
                             },
                         },
                         tooltip: {
@@ -746,9 +887,9 @@ function renderStudents(students) {
     students.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
 
     students.forEach((s) => {
-        const deleteButtonHtml = isSecretary
-            ? ""
-            : `
+        const deleteButtonHtml = isSecretary ?
+            "" :
+            `
           <button class="btn btn-outline-danger" onclick="deleteStudent('${s.id}')" title="Excluir Cadastro">
             <i class="bi bi-trash"></i>
           </button>`;
@@ -814,7 +955,7 @@ async function viewStudent(id) {
         const student = students.find((s) => String(s.id) === String(id));
 
         if (!student) {
-            alert("Membro não encontrado na base de dados.");
+            showToast("Membro não encontrado na base de dados.", "warning", "Cadastro");
             return;
         }
 
@@ -827,7 +968,7 @@ async function viewStudent(id) {
         modalStudent.show();
     } catch (e) {
         console.error("Erro ao visualizar membro:", e);
-        alert("Erro ao carregar dados do membro.");
+        showToast("Erro ao carregar dados do membro.", "danger", "Cadastro");
     }
 }
 
@@ -837,7 +978,7 @@ async function editStudent(id) {
         const student = students.find((s) => String(s.id) === String(id));
 
         if (!student) {
-            alert("Membro não encontrado para edição.");
+            showToast("Membro não encontrado para edição.", "warning", "Cadastro");
             return;
         }
 
@@ -850,7 +991,7 @@ async function editStudent(id) {
         modalStudent.show();
     } catch (e) {
         console.error("Erro ao editar membro:", e);
-        alert("Erro ao carregar dados para edição.");
+        showToast("Erro ao carregar dados para edição.", "danger", "Cadastro");
     }
 }
 
@@ -896,6 +1037,11 @@ document.getElementById("form-student").addEventListener("submit", async (e) => 
 
     await apiPost("Membros", actionType, newS);
     modalStudent.hide();
+    showToast(
+        actionType === "create" ? "Membro cadastrado com sucesso." : "Cadastro do membro atualizado com sucesso.",
+        "success",
+        "Cadastro salvo"
+    );
     renderApp();
 });
 
@@ -903,9 +1049,10 @@ async function deleteStudent(id) {
     if (!confirm("Deseja realmente excluir este cadastro?")) return;
     try {
         await apiPost("Membros", "delete", id);
+        showToast("Membro excluído com sucesso.", "success", "Cadastro");
         renderApp();
     } catch (err) {
-        alert("Erro ao excluir membro.");
+        showToast("Erro ao excluir membro.", "danger", "Cadastro");
     }
 }
 
@@ -949,7 +1096,7 @@ async function viewTx(id) {
         const tx = finance.find((f) => String(f.id) === String(id));
 
         if (!tx) {
-            alert("Lançamento não encontrado.");
+            showToast("Lançamento não encontrado.", "warning", "Finanças");
             return;
         }
 
@@ -964,7 +1111,7 @@ async function viewTx(id) {
         modalTx.show();
     } catch (e) {
         console.error("Erro ao visualizar lançamento:", e);
-        alert("Erro ao carregar dados do lançamento.");
+        showToast("Erro ao carregar dados do lançamento.", "danger", "Finanças");
     }
 }
 
@@ -974,7 +1121,7 @@ async function editTx(id) {
         const tx = finance.find((f) => String(f.id) === String(id));
 
         if (!tx) {
-            alert("Lançamento não encontrado para edição.");
+            showToast("Lançamento não encontrado para edição.", "warning", "Finanças");
             return;
         }
 
@@ -989,7 +1136,7 @@ async function editTx(id) {
         modalTx.show();
     } catch (e) {
         console.error("Erro ao editar lançamento:", e);
-        alert("Erro ao carregar lançamento para edição.");
+        showToast("Erro ao carregar lançamento para edição.", "danger", "Finanças");
     }
 }
 
@@ -1082,15 +1229,15 @@ function renderFinance(finance) {
 
     finance.forEach((t) => {
         const dt = t.date ? parseLocalDate(t.date) : null;
-        const formattedDate = dt
-            ? `${String(dt.getDate()).padStart(2, "0")}/${String(dt.getMonth() + 1).padStart(2, "0")}/${dt.getFullYear()}`
-            : "-";
+        const formattedDate = dt ?
+            `${String(dt.getDate()).padStart(2, "0")}/${String(dt.getMonth() + 1).padStart(2, "0")}/${dt.getFullYear()}` :
+            "-";
 
         const isIncome = t.type === "Entrada";
         const typeIcon = isIncome ? "bi-arrow-up-circle-fill" : "bi-arrow-down-circle-fill";
         const badgeClass = isIncome ? "bg-success" : "bg-danger";
 
-        tbody.innerHTML += `<tr>
+        tbody.innerHTML += `<tr class="align-middle">
       <td>${t.code || "-"}</td>
       <td>${formattedDate}</td>
       <td>
@@ -1155,12 +1302,18 @@ document.getElementById("form-transaction").addEventListener("submit", async (e)
 
     await apiPost("Financas", actionType, newT);
     modalTx.hide();
+    showToast(
+        isUpdate ? "Lançamento atualizado com sucesso." : "Lançamento financeiro registrado com sucesso.",
+        "success",
+        "Finanças"
+    );
     renderApp();
 });
 
 async function deleteTx(id) {
     if (confirm("Deseja realmente excluir esta transação?")) {
         await apiPost("Financas", "delete", id);
+        showToast("Lançamento excluído com sucesso.", "success", "Finanças");
         renderApp();
     }
 }
@@ -1217,7 +1370,9 @@ function renderReports(finance) {
     });
 
     /* 2. SEGUNDO: Gera o balancete passando apenas 'txsFiltradas' (e não o 'finance' bruto) */
-    const { accounts } = buildBalancetePostings(txsFiltradas, yearSel, monthSel);
+    const {
+        accounts
+    } = buildBalancetePostings(txsFiltradas, yearSel, monthSel);
 
     /* Renderizar tabela do balancete */
     const tbody = document.getElementById("tbody-balancete-contabil");
@@ -1280,7 +1435,7 @@ function renderReports(finance) {
     if (elExercicio) elExercicio.textContent = yearSel;
     if (elMesRef)
         elMesRef.textContent =
-            monthSel === "all" ? "Todos os Meses" : (Number(monthSel) + 1).toString().padStart(2, "0");
+        monthSel === "all" ? "Todos os Meses" : (Number(monthSel) + 1).toString().padStart(2, "0");
     if (elQtdContas) elQtdContas.textContent = qtdContas;
 
     renderCategorySummaries(txsFiltradas);
@@ -1304,13 +1459,19 @@ function renderCategorySummaries(finance) {
         const catName = t.category || "Geral / Outros";
 
         if (t.type === "Entrada") {
-            if (!incomeCategories[catName]) incomeCategories[catName] = { count: 0, amount: 0 };
+            if (!incomeCategories[catName]) incomeCategories[catName] = {
+                count: 0,
+                amount: 0
+            };
             incomeCategories[catName].count++;
             incomeCategories[catName].amount += val;
             totalInCount++;
             totalInAmount += val;
         } else if (t.type === "Saída") {
-            if (!expenseCategories[catName]) expenseCategories[catName] = { count: 0, amount: 0 };
+            if (!expenseCategories[catName]) expenseCategories[catName] = {
+                count: 0,
+                amount: 0
+            };
             expenseCategories[catName].count++;
             expenseCategories[catName].amount += val;
             totalOutCount++;
@@ -1345,9 +1506,29 @@ function renderCategorySummaries(finance) {
 /* Eventos dos filtros de relatório */
 document.getElementById("rep-filter-year").addEventListener("change", () => renderReports(globalFinanceCache));
 document.getElementById("rep-filter-month").addEventListener("change", () => renderReports(globalFinanceCache));
+
 function printReportLandscape() {
     window.print();
 }
+
+/* GIAR — versão e publicação preenchidas automaticamente pelo build do Netlify */
+(function renderBuildInfo() {
+    const meta = window.GIAR_BUILD || {};
+    const versionEl = document.getElementById("app-version");
+    const publishedEl = document.getElementById("app-published-at");
+
+    if (versionEl) {
+        versionEl.textContent = meta.version ? `Versão ${meta.version}` : "Versão local";
+    }
+
+    if (publishedEl) {
+        publishedEl.textContent = meta.publishedAt ?
+            `Publicado em ${meta.publishedAt}` :
+            "Publicação local";
+    }
+
+    window.GIAR_BUILD = meta;
+})();
 
 /* Inicialização */
 if (sessionStorage.getItem("giar_active_user")) {
