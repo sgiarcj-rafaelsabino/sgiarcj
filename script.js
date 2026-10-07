@@ -949,6 +949,7 @@ function fillModalStudent(s) {
     document.getElementById("student-uf").value = s.uf || "";
 
     document.getElementById("student-notes").value = s.notes || "";
+    document.getElementById("student-position").value = s.position || "";
 }
 
 function setModalFieldsDisabled(disabled) {
@@ -1046,6 +1047,7 @@ document.getElementById("form-student").addEventListener("submit", async (e) => 
         uf: document.getElementById("student-uf").value,
         class: document.getElementById("student-class").value,
         notes: document.getElementById("student-notes").value,
+        position: document.getElementById("student-position").value,
     };
 
     await apiPost("Membros", actionType, newS);
