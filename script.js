@@ -405,7 +405,20 @@ function applyUserPermissions(user) {
 }
 
 /* Busca de CEP */
-document.getElementById("student-cep").addEventListener("blur", async (e) => {
+
+const cepInput = document.getElementById("student-cep");
+
+/* 1. Máscara de CEP enquanto digita */
+cepInput.addEventListener("input", (e) => {
+    let value = e.target.value.replace(/\D/g, "").substring(0, 8);
+    if (value.length > 5) {
+        value = value.replace(/^(\d{5})(\d)/, "$1-$2");
+    }
+    e.target.value = value;
+});
+
+/* 2. Busca de CEP ao sair do campo (blur) */
+cepInput.addEventListener("blur", async (e) => {
     const cep = e.target.value.replace(/\D/g, "");
     if (cep.length === 8) {
         try {
