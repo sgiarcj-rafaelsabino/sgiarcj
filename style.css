@@ -386,6 +386,12 @@ body  {
   padding: 1.8rem !important;
 }
 
+.unauthenticated #modalLogin .modal-dialog {
+  margin: auto !important;
+  width: 100%;
+  max-width: 430px; /* Mantém a largura máxima que você já definiu */
+}
+
 /* Relatórios */ #table-report thead th  {
   background: var(--brand-dark);
   color: #fff;
