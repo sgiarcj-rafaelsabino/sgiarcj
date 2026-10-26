@@ -62,6 +62,10 @@ body  {
   background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%) !important;
 }
 
+#modalLogin .modal-dialog {
+    margin-top: 55px;
+}
+
 .unauthenticated body  {
   padding-top: 0;
   padding-bottom: 0;
@@ -384,12 +388,6 @@ body  {
 
 #modalLogin .modal-body  {
   padding: 1.8rem !important;
-}
-
-.unauthenticated #modalLogin .modal-dialog {
-  margin: auto !important;
-  width: 100%;
-  max-width: 430px; /* Mantém a largura máxima que você já definiu */
 }
 
 /* Relatórios */ #table-report thead th  {
