@@ -1704,6 +1704,7 @@ body:after  {
   justify-content:center;
   width:48px;
   height:48px;
+  margin-top:16px;
   margin-bottom:16px;
   border-radius:14px;
   background:linear-gradient(145deg,#2f6fed,#1a438d);
